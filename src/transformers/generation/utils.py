@@ -1412,7 +1412,7 @@ class GenerationMixin:
                     " greedy search."
                 )
 
-            # 11. run greedy search
+            # 11. run greedy search ATODO: this is the point of entry for gpt2 autoregressive decoding
             return self.greedy_search(
                 input_ids,
                 logits_processor=logits_processor,
