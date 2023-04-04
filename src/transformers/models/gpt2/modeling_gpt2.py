@@ -131,6 +131,9 @@ class GPT2Attention(nn.Module):
                 1, 1, max_positions, max_positions
             ),
         )
+
+        #Anisha: trying to get max_seq_length model.config.max_position_embeddings
+        self.max_positions = max_positions
         self.register_buffer("masked_bias", torch.tensor(-1e4))
 
         self.embed_dim = config.hidden_size
@@ -766,6 +769,8 @@ class GPT2Model(GPT2PreTrainedModel):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple, BaseModelOutputWithPastAndCrossAttentions]:
+
+        print("Anisha: inside forward of class GPT2Model(GPT2PreTrainedModel) in modeling_gpt2:")
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -778,6 +783,8 @@ class GPT2Model(GPT2PreTrainedModel):
         elif input_ids is not None:
             input_shape = input_ids.size()
             input_ids = input_ids.view(-1, input_shape[-1])
+            #Anisha: this needs to change because input_shape[-1] no longer gives the # of columns of input prompt
+            #Anisha: but this is redundant for our case because the shape stays unchanged with these ops
             batch_size = input_ids.shape[0]
         elif inputs_embeds is not None:
             input_shape = inputs_embeds.size()[:-1]
@@ -787,12 +794,12 @@ class GPT2Model(GPT2PreTrainedModel):
 
         device = input_ids.device if input_ids is not None else inputs_embeds.device
 
-        if token_type_ids is not None:
+        if token_type_ids is not None: #Anisha: token_type_ids is None for us
             token_type_ids = token_type_ids.view(-1, input_shape[-1])
         if position_ids is not None:
-            position_ids = position_ids.view(-1, input_shape[-1])
+            position_ids = position_ids.view(-1, input_shape[-1]) #Anisha: should be no op for us
 
-        if past_key_values is None:
+        if past_key_values is None: #Anisha: initially it is None for iteration 1
             past_length = 0
             past_key_values = tuple([None] * len(self.h))
         else:
@@ -1005,30 +1012,50 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
         self.lm_head = new_embeddings
 
     def prepare_inputs_for_generation(self, input_ids, past_key_values=None, inputs_embeds=None, **kwargs):
+        print("Anisha: inside prepare_inputs_for_generation \n Anisha kwarg=", kwargs)
         token_type_ids = kwargs.get("token_type_ids", None)
         # only last token for inputs_ids if past is defined in kwargs
         if past_key_values:
-            input_ids = input_ids[:, -1].unsqueeze(-1)
+            print("Anisha: recompilation happening for token_type_ids?")
+            # input_ids = input_ids[:, -1].unsqueeze(-1) # Anisha: transformers by default only keep the last column of input_ids from 2nd iteration onwards
+            ##but for ARD we are not modifying input_ids?
             if token_type_ids is not None:
                 token_type_ids = token_type_ids[:, -1].unsqueeze(-1)
 
         attention_mask = kwargs.get("attention_mask", None)
         position_ids = kwargs.get("position_ids", None)
 
+        print("Anisha: attention_mask = ", attention_mask)
+        print("Anisha: position_ids = ", position_ids)
+        if not past_key_values:
+            print("Anisha: past_key_values = None ", past_key_values)
+        else:                  
+            print("Anisha: past_key_values.shape() = ", len(past_key_values))
+        print("Anisha: token_type_ids = ", token_type_ids)
+        print("Anisha: use_cache = ", kwargs.get("use_cache"))
+
+
         if attention_mask is not None and position_ids is None:
+            print("Anisha: position_ids being created on the fly")
             # create position_ids on the fly for batch generation
             position_ids = attention_mask.long().cumsum(-1) - 1
             position_ids.masked_fill_(attention_mask == 0, 1)
+            self.start_position_ids = 0
+            self.end_position_ids = self.cur_pos
             if past_key_values:
-                position_ids = position_ids[:, -1].unsqueeze(-1)
+                # position_ids = position_ids[:, -1].unsqueeze(-1) #Anisha: position_ids is no longer the last column but rather self.cur_pos col
+                self.start_position_ids = self.cur_pos
+                self.end_position_ids = self.cur_pos
         else:
             position_ids = None
+
+        print("Anisha: flying position_ids = ", position_ids)
 
         # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
         if inputs_embeds is not None and past_key_values is None:
             model_inputs = {"inputs_embeds": inputs_embeds}
         else:
-            model_inputs = {"input_ids": input_ids}
+            model_inputs = {"input_ids": input_ids[:,self.cur_pos]}
 
         model_inputs.update(
             {
@@ -1108,6 +1135,8 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
         if not return_dict:
             output = (lm_logits,) + transformer_outputs[1:]
             return ((loss,) + output) if loss is not None else output
+
+        print("Anisha: outputting CausalLMOutputWithCrossAttentions")
 
         return CausalLMOutputWithCrossAttentions(
             loss=loss,
