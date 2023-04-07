@@ -167,6 +167,7 @@ class GPT2Attention(nn.Module):
         self.pruned_heads = set()
 
     def prune_heads(self, heads):
+        print("Anisha: pruning heads")
         if len(heads) == 0:
             return
         heads, index = find_pruneable_heads_and_indices(heads, self.num_heads, self.head_dim, self.pruned_heads)
@@ -291,8 +292,8 @@ class GPT2Attention(nn.Module):
 
     def forward(
         self,
-        hidden_states: Optional[Tuple[torch.FloatTensor]],
-        layer_past: Optional[Tuple[torch.Tensor]] = None,
+        hidden_states: Optional[Tuple[torch.FloatTensor]], #batch x seqlen x model_dim
+        layer_past: Optional[List[torch.Tensor]] = None, #Anisha: made this into Optional[List[torch.Tensor]] from Optional[Tuple[torch.Tensor]]
         attention_mask: Optional[torch.FloatTensor] = None,
         head_mask: Optional[torch.FloatTensor] = None,
         encoder_hidden_states: Optional[torch.Tensor] = None,
@@ -307,20 +308,28 @@ class GPT2Attention(nn.Module):
                     "Please make sure to instantiate class with `GPT2Attention(..., is_cross_attention=True)`."
                 )
 
-            query = self.q_attn(hidden_states)
-            key, value = self.c_attn(encoder_hidden_states).split(self.split_size, dim=2)
+            query = self.q_attn(hidden_states) #batch x seqlen x model_dim
+            key, value = self.c_attn(encoder_hidden_states).split(self.split_size, dim=2) #batch x seqlen x model_dim
             attention_mask = encoder_attention_mask
         else:
             query, key, value = self.c_attn(hidden_states).split(self.split_size, dim=2)
 
-        query = self._split_heads(query, self.num_heads, self.head_dim)
+        query = self._split_heads(query, self.num_heads, self.head_dim) #batch x seqlen x num_heads x head_dim
         key = self._split_heads(key, self.num_heads, self.head_dim)
         value = self._split_heads(value, self.num_heads, self.head_dim)
 
+
         if layer_past is not None:
-            past_key, past_value = layer_past
-            key = torch.cat((past_key, key), dim=-2)
-            value = torch.cat((past_value, value), dim=-2)
+            past_key, past_value = layer_past #Anisha: TODO: self.cache_k = self.cache_k.to(xq); self.cache_v = self.cache_v.to(xq)
+            batch_size, seqlen, _, _ = past_key.shape
+            # key = torch.cat((past_key, key), dim=-2)#Anisha: change this, insert into past instead of 
+            # concatenation key, similar to cache_k in llama
+            # value = torch.cat((past_value, value), dim=-2)
+            past_key[:batch_size,self.start_pos:self.start_pos + seq_len] = key
+            past_value[:batch_size, self.start_pos:self.start_pos + seq_len] = value
+
+            key = past_key[:batch_size, : self.start_pos + seq_len]
+            value = self.cache_v[:bsz, : self.start_pos + seq_len]
 
         if use_cache is True:
             present = (key, value)
@@ -799,11 +808,24 @@ class GPT2Model(GPT2PreTrainedModel):
         if position_ids is not None:
             position_ids = position_ids.view(-1, input_shape[-1]) #Anisha: should be no op for us
 
-        if past_key_values is None: #Anisha: initially it is None for iteration 1
-            past_length = 0
-            past_key_values = tuple([None] * len(self.h))
-        else:
-            past_length = past_key_values[0][0].size(-2)
+        # if past_key_values is None: #Anisha: initially it is None for iteration 1
+        #     past_length = 0
+        #     past_key_values = tuple([None] * len(self.h))
+        # else:
+        #Anisha: Initialize past_key_values
+        past_key_values = [
+            #keys
+            [torch.zeros(
+            (batch_size, args.max_seq_len, self.num_heads, self.head_dim)) for _ in range(len(self.h))],
+            #values
+            [torch.zeros(
+            (batch_size, args.max_seq_len, self.num_heads, self.head_dim)) for _ in range(len(self.h))]
+        ]
+        past_length = past_key_values[0][0].size(-2)
+        
+        
+
+        #Anisha: TODO: is position_ids None? it is initially None, later on we get flying position_ids
         if position_ids is None:
             position_ids = torch.arange(past_length, input_shape[-1] + past_length, dtype=torch.long, device=device)
             position_ids = position_ids.unsqueeze(0).view(-1, input_shape[-1])
@@ -848,7 +870,7 @@ class GPT2Model(GPT2PreTrainedModel):
         if inputs_embeds is None:
             inputs_embeds = self.wte(input_ids)
         position_embeds = self.wpe(position_ids)
-        hidden_states = inputs_embeds + position_embeds
+        hidden_states = inputs_embeds + position_embeds #Anisha: batch x seqlen x model_dim
 
         if token_type_ids is not None:
             token_type_embeds = self.wte(token_type_ids)
