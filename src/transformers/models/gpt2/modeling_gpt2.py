@@ -310,7 +310,7 @@ class GPT2Attention(nn.Module):
 
             query = self.q_attn(hidden_states) #batch x seqlen x model_dim
             key, value = self.c_attn(encoder_hidden_states).split(self.split_size, dim=2) #batch x seqlen x model_dim
-            attention_mask = encoder_attention_mask
+            attention_mask = encoder_attention_mask #Anisha: TODO: ensure attention_mask is right size and value
         else:
             query, key, value = self.c_attn(hidden_states).split(self.split_size, dim=2)
 
@@ -810,17 +810,8 @@ class GPT2Model(GPT2PreTrainedModel):
 
         # if past_key_values is None: #Anisha: initially it is None for iteration 1
         #     past_length = 0
-        #     past_key_values = tuple([None] * len(self.h))
+        # #     past_key_values = tuple([None] * len(self.h))
         # else:
-        #Anisha: Initialize past_key_values
-        past_key_values = [
-            #keys
-            [torch.zeros(
-            (batch_size, args.max_seq_len, self.num_heads, self.head_dim)) for _ in range(len(self.h))],
-            #values
-            [torch.zeros(
-            (batch_size, args.max_seq_len, self.num_heads, self.head_dim)) for _ in range(len(self.h))]
-        ]
         past_length = past_key_values[0][0].size(-2)
         
         
@@ -1045,7 +1036,9 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
                 token_type_ids = token_type_ids[:, -1].unsqueeze(-1)
 
         attention_mask = kwargs.get("attention_mask", None)
-        position_ids = kwargs.get("position_ids", None)
+        position_ids = kwargs.get("position_ids", None) 
+        input_pos_tensor = kwargs.get("input_pos_tensor", None)
+        cur_pos_tensor = kwargs.get("cur_pos_tensor", None)
 
         print("Anisha: attention_mask = ", attention_mask)
         print("Anisha: position_ids = ", position_ids)
@@ -1057,27 +1050,27 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
         print("Anisha: use_cache = ", kwargs.get("use_cache"))
 
 
-        if attention_mask is not None and position_ids is None:
-            print("Anisha: position_ids being created on the fly")
-            # create position_ids on the fly for batch generation
-            position_ids = attention_mask.long().cumsum(-1) - 1
-            position_ids.masked_fill_(attention_mask == 0, 1)
-            self.start_position_ids = 0
-            self.end_position_ids = self.cur_pos
-            if past_key_values:
-                # position_ids = position_ids[:, -1].unsqueeze(-1) #Anisha: position_ids is no longer the last column but rather self.cur_pos col
-                self.start_position_ids = self.cur_pos
-                self.end_position_ids = self.cur_pos
-        else:
-            position_ids = None
+        # if attention_mask is not None and position_ids is None:
+        #     print("Anisha: WE SHOULDNOT HIT THIS: position_ids being created on the fly")
+        #     # create position_ids on the fly for batch generation
+        #     position_ids = attention_mask.long().cumsum(-1) - 1
+        #     position_ids.masked_fill_(attention_mask == 0, 1)
+        #     if past_key_values:
+        #         # position_ids = position_ids[:, -1].unsqueeze(-1) #Anisha: position_ids is no longer the last column but rather self.cur_pos col
+        #         self.start_position_ids = self.cur_pos
+        #         self.end_position_ids = self.cur_pos
+        # else:
+        #     position_ids = None
 
-        print("Anisha: flying position_ids = ", position_ids)
+        # print("Anisha: flying position_ids = ", position_ids)
+
+        
 
         # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
         if inputs_embeds is not None and past_key_values is None:
             model_inputs = {"inputs_embeds": inputs_embeds}
         else:
-            model_inputs = {"input_ids": input_ids[:,self.cur_pos]}
+            model_inputs = {"input_ids": input_ids.index_select(1, input_pos_tensor)}
 
         model_inputs.update(
             {
@@ -1088,6 +1081,7 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
                 "token_type_ids": token_type_ids,
             }
         )
+        
         return model_inputs
 
     @add_start_docstrings_to_model_forward(GPT2_INPUTS_DOCSTRING)
