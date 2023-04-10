@@ -19,7 +19,7 @@ import math
 import os
 import warnings
 from dataclasses import dataclass
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Union, List
 
 import torch
 import torch.utils.checkpoint
@@ -300,6 +300,7 @@ class GPT2Attention(nn.Module):
         encoder_attention_mask: Optional[torch.FloatTensor] = None,
         use_cache: Optional[bool] = False,
         output_attentions: Optional[bool] = False,
+        position_ids:Optional[torch.Tensor] = None,
     ) -> Tuple[Union[torch.Tensor, Tuple[torch.Tensor]], ...]:
         if encoder_hidden_states is not None:
             if not hasattr(self, "q_attn"):
@@ -312,7 +313,9 @@ class GPT2Attention(nn.Module):
             key, value = self.c_attn(encoder_hidden_states).split(self.split_size, dim=2) #batch x seqlen x model_dim
             attention_mask = encoder_attention_mask #Anisha: TODO: ensure attention_mask is right size and value
         else:
-            query, key, value = self.c_attn(hidden_states).split(self.split_size, dim=2)
+            query, key, value = self.c_attn(hidden_states).split(self.split_size, dim=2) 
+        
+        #Anisha: query, key, value is xq,xk,xv
 
         query = self._split_heads(query, self.num_heads, self.head_dim) #batch x seqlen x num_heads x head_dim
         key = self._split_heads(key, self.num_heads, self.head_dim)
@@ -320,22 +323,41 @@ class GPT2Attention(nn.Module):
 
 
         if layer_past is not None:
+            print("Anisha: layer_past is not None, len(layer_past)=", len(layer_past))
             past_key, past_value = layer_past #Anisha: TODO: self.cache_k = self.cache_k.to(xq); self.cache_v = self.cache_v.to(xq)
-            batch_size, seqlen, _, _ = past_key.shape
+            past_key = past_key.to(key)
+            past_value = past_key.to(value)
+
+            print("Anisha: position_ids.shape={}, past_key.shape={}, original key.shape={}".format(position_ids.shape, past_key.shape, key.shape))
+
+            # batch_size, seqlen, _, _ = past_key.shape
             # key = torch.cat((past_key, key), dim=-2)#Anisha: change this, insert into past instead of 
             # concatenation key, similar to cache_k in llama
             # value = torch.cat((past_value, value), dim=-2)
-            past_key[:batch_size,self.start_pos:self.start_pos + seq_len] = key
-            past_value[:batch_size, self.start_pos:self.start_pos + seq_len] = value
+            # past_key[:batch_size,self.start_pos:self.start_pos + seq_len] = key
+            # past_value[:batch_size, self.start_pos:self.start_pos + seq_len] = value
+            
+            # key = past_key[:batch_size, : self.start_pos + seq_len]
+            # value = self.cache_v[:bsz, : self.start_pos + seq_len]
 
-            key = past_key[:batch_size, : self.start_pos + seq_len]
-            value = self.cache_v[:bsz, : self.start_pos + seq_len]
+            past_key.index_copy_(1, position_ids, key.transpose(1,2))
+            past_value.index_copy_(1, position_ids, value.transpose(1,2))
 
+            #Anisha: TODO: need to update key and value as the correct slice of past_key/past_value
+            key = past_key[:,:]
+            print("Anisha: key.shape after key = past_key[:,:] is ", key.shape)
+            key = key.transpose(1,2)
+            print("Anisha: key.shape after key = key.transpose(1,2) is ", key.shape)
+            value = past_value[:,:]
+            value = value.transpose(1,2)
+            
+        #Anisha: TODO: do we need to return present anymore?
         if use_cache is True:
             present = (key, value)
         else:
             present = None
 
+        
         if self.reorder_and_upcast_attn:
             attn_output, attn_weights = self._upcast_and_reordered_attn(query, key, value, attention_mask, head_mask)
         else:
@@ -395,6 +417,7 @@ class GPT2Block(nn.Module):
         encoder_attention_mask: Optional[torch.FloatTensor] = None,
         use_cache: Optional[bool] = False,
         output_attentions: Optional[bool] = False,
+        position_ids:Optional[torch.Tensor] = None,
     ) -> Union[Tuple[torch.Tensor], Optional[Tuple[torch.Tensor, Tuple[torch.FloatTensor, ...]]]]:
         residual = hidden_states
         hidden_states = self.ln_1(hidden_states)
@@ -405,6 +428,7 @@ class GPT2Block(nn.Module):
             head_mask=head_mask,
             use_cache=use_cache,
             output_attentions=output_attentions,
+            position_ids=position_ids,
         )
         attn_output = attn_outputs[0]  # output_attn: a, present, (attentions)
         outputs = attn_outputs[1:]
@@ -882,13 +906,19 @@ class GPT2Model(GPT2PreTrainedModel):
         all_self_attentions = () if output_attentions else None
         all_cross_attentions = () if output_attentions and self.config.add_cross_attention else None
         all_hidden_states = () if output_hidden_states else None
-        for i, (block, layer_past) in enumerate(zip(self.h, past_key_values)):
+        # for i, (block, layer_past) in enumerate(zip(self.h, past_key_values)):
+        for i, block in enumerate(self.h): #Anisha: i is the layer index
             # Model parallel
+            layer_past = [past_key_values[0][i],past_key_values[1][i]]
+            print("Anisha: inside forward of GPT2's Model parallel")
             if self.model_parallel:
                 torch.cuda.set_device(hidden_states.device)
                 # Ensure layer_past is on same device as hidden_states (might not be correct)
                 if layer_past is not None:
-                    layer_past = tuple(past_state.to(hidden_states.device) for past_state in layer_past)
+                    # layer_past = tuple(past_state.to(hidden_states.device) for past_state in layer_past)
+                    #Anisha: move every tensor in cache_k and cache_v to device
+                    layer_past[0] = layer_past[0].to(hidden_states.device)
+                    layer_past[1] = layer_past[1].to(hidden_states.device)
                 # Ensure that attention_mask is always on the same device as hidden_states
                 if attention_mask is not None:
                     attention_mask = attention_mask.to(hidden_states.device)
@@ -925,6 +955,7 @@ class GPT2Model(GPT2PreTrainedModel):
                     encoder_attention_mask=encoder_attention_mask,
                     use_cache=use_cache,
                     output_attentions=output_attentions,
+                    position_ids=position_ids,
                 )
 
             hidden_states = outputs[0]
