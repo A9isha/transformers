@@ -317,9 +317,9 @@ class GPT2Attention(nn.Module):
         
         #Anisha: query, key, value is xq,xk,xv
 
-        query = self._split_heads(query, self.num_heads, self.head_dim) #batch x seqlen x num_heads x head_dim
-        key = self._split_heads(key, self.num_heads, self.head_dim)
-        value = self._split_heads(value, self.num_heads, self.head_dim)
+        query = self._split_heads(query, self.num_heads, self.head_dim) #batch x num_heads x seqlen x head_dim
+        key = self._split_heads(key, self.num_heads, self.head_dim) #batch x num_heads x seqlen x head_dim
+        value = self._split_heads(value, self.num_heads, self.head_dim) #batch x num_heads x seqlen x head_dim
 
 
         if layer_past is not None:
@@ -328,7 +328,8 @@ class GPT2Attention(nn.Module):
             past_key = past_key.to(key)
             past_value = past_key.to(value)
 
-            print("Anisha: position_ids.shape={}, past_key.shape={}, original key.shape={}".format(position_ids.shape, past_key.shape, key.shape))
+            print("Anisha: position_ids={}, position_ids.shape={}, past_key.shape={}, \
+            original key.shape={}".format(position_ids,position_ids.shape, past_key.shape, key.shape))
 
             # batch_size, seqlen, _, _ = past_key.shape
             # key = torch.cat((past_key, key), dim=-2)#Anisha: change this, insert into past instead of 
@@ -340,8 +341,13 @@ class GPT2Attention(nn.Module):
             # key = past_key[:batch_size, : self.start_pos + seq_len]
             # value = self.cache_v[:bsz, : self.start_pos + seq_len]
 
-            past_key.index_copy_(1, position_ids, key.transpose(1,2))
-            past_value.index_copy_(1, position_ids, value.transpose(1,2))
+            print("Anisha: older past_key.index_select(1,torch.squeeze(position_ids,-1))=",past_key.index_select(1,torch.squeeze(position_ids,-1)))
+            print("Anisha: older past_key.index_select(1,torch.squeeze(position_ids,-1))=",past_value.index_select(1,torch.squeeze(position_ids,-1)))
+            past_key.index_copy_(1, torch.squeeze(position_ids,-1), key.transpose(1,2))
+            past_value.index_copy_(1, torch.squeeze(position_ids,-1), value.transpose(1,2))
+            print("Anisha: newer past_key.index_select(1,torch.squeeze(position_ids,-1))=",past_key.index_select(1,torch.squeeze(position_ids,-1)))
+            print("Anisha: newer past_key.index_select(1,torch.squeeze(position_ids,-1))=",past_value.index_select(1,torch.squeeze(position_ids,-1)))
+            
 
             #Anisha: TODO: need to update key and value as the correct slice of past_key/past_value
             key = past_key[:,:]
@@ -829,8 +835,10 @@ class GPT2Model(GPT2PreTrainedModel):
 
         if token_type_ids is not None: #Anisha: token_type_ids is None for us
             token_type_ids = token_type_ids.view(-1, input_shape[-1])
+        
+        #Anisha: This reshapes position_ids
         if position_ids is not None:
-            position_ids = position_ids.view(-1, input_shape[-1]) #Anisha: should be no op for us
+            position_ids = position_ids.view(-1, input_shape[-1]) 
 
         # if past_key_values is None: #Anisha: initially it is None for iteration 1
         #     past_length = 0

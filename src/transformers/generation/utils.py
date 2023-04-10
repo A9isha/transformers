@@ -2231,7 +2231,8 @@ class GenerationMixin:
         xm.mark_step() #Anisha:TODO: TypeError: mark_step() got an unexpected keyword argument 'wait'
         print(f"Input initialization in {time.time() - input_prepare_start_time:.2f} seconds")
 
-        print("Anisha: input_ids.shape={}, input_text_mask.shape={}, self.cur_pos_tensor = {}".format(input_ids.shape,input_text_mask.shape,cur_pos_tensor))
+        print("Anisha: input_ids.shape={}, input_text_mask.shape={}, input_pos_tensor = {}, input_pos_tensor.shape= {}"\
+        .format(input_ids.shape,input_text_mask.shape,input_pos_tensor, input_pos_tensor.shape))
 
         print("Anisha: self.config = {}".format(self.config))
 
@@ -2334,7 +2335,7 @@ class GenerationMixin:
             next_tokens = next_tokens.unsqueeze(1)
             # update generated ids, model inputs, and length for next step
             # input_ids = torch.cat([input_ids, next_tokens[:, None]], dim=-1) 
-            input_ids.index_copy_(1, cur_pos_tensor, next_token) #Anisha: using index_copy to update
+            input_ids.index_copy_(1, cur_pos_tensor, next_tokens) #Anisha: using index_copy to update
             
             # model_kwargs = self._update_model_kwargs_for_generation(
             #     outputs, model_kwargs, is_encoder_decoder=self.config.is_encoder_decoder
