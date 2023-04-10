@@ -2317,6 +2317,8 @@ class GenerationMixin:
 
             # argmax
             next_tokens = torch.argmax(next_tokens_scores, dim=-1)
+            print("Anisha: for cur_pos_tensor = {}, next_tokens.shape = {}, next_tokens = {} "\
+            .format(cur_pos_tensor, next_tokens.shape, next_tokens))
 
             # finished sentences should have their next token be a padding token
             if eos_token_id is not None:
@@ -2345,6 +2347,7 @@ class GenerationMixin:
             input_pos_tensor = input_pos_tensor[-1:] + 1
             cur_pos_tensor += 1
             output_pos_tensor = cur_pos_tensor - 1
+            start_pos += 1
 
             # if eos_token was found in one sentence, set sentence to finished
             if eos_token_id_tensor is not None:
@@ -2353,7 +2356,13 @@ class GenerationMixin:
                 )
 
             # stop when each sentence is finished, or if we exceed the maximum length
-            if unfinished_sequences.max() == 0 or stopping_criteria(input_ids, scores):
+            # if unfinished_sequences.max() == 0 or stopping_criteria(input_ids, scores):
+            #Anisha: TODO unfinished_sequences
+            #Anisha:generate total_len-start_pos # of tokens
+            if unfinished_sequences.max() == 0 or start_pos==total_len:
+                print("Anisha: ending because unfinished_sequences.max() == 0 = {}, start_pos={}, start_pos==total_len= {}".\
+                format(unfinished_sequences.max() == 0, start_pos, start_pos==total_len)
+                )
                 if not synced_gpus:
                     break
                 else:

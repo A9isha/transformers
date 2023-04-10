@@ -11,6 +11,12 @@ import json
 
 
 from transformers import AutoModelForCausalLM
+
+def pretty_print(s):
+    print("Output:\n" + 100 * '-')
+    print(tokenizer.decode(s, skip_special_tokens=True))
+
+
 model = AutoModelForCausalLM.from_pretrained("gpt2")
 print("model",model)
 
@@ -33,3 +39,7 @@ inputs = inputs.to(device)
 outputs=model.generate(**inputs, max_new_tokens=80, do_sample=False)
 print("outputs=")
 print(outputs)   
+
+for output in outputs:
+    pretty_print(output)
+
