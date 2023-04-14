@@ -2237,6 +2237,22 @@ class GenerationMixin:
         print("Anisha: self.config = {}".format(self.config))
 
         this_peer_finished = False  # used by synced_gpus only
+
+        #Anisha: Initialize past_key_values
+        past_key_values = [
+            #keys
+            [torch.zeros(
+            (input_ids.shape[0], input_ids.shape[1], self.config.n_head, self.config.n_embd//self.config.n_head)) for _ in range(self.config.num_hidden_layers)],
+            #values
+            [torch.zeros(
+            (input_ids.shape[0], input_ids.shape[1], self.config.n_head, self.config.n_embd//self.config.n_head)) for _ in range(self.config.num_hidden_layers)]
+        ] # batch_size x max_seq_len x num_heads x head_dim
+
+        cache_k, cache_v = past_key_values
+
+        print("Anisha: layer 1 cache_k's shape=past_key_values[0].shape = ", cache_k[0].shape)
+        print("Anisha: layer 1 cache_v's shape=past_key_values[1].shape = ", cache_v[0].shape)
+        
         while True:
             #Anisha: TODO add break condition of start_pos==total_length-1
             
@@ -2252,24 +2268,11 @@ class GenerationMixin:
 
             # prepare model inputs
             # model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
-            #Anisha: Initialize past_key_values
-            past_key_values = [
-                #keys
-                [torch.zeros(
-                (input_ids.shape[0], input_ids.shape[1], self.config.n_head, self.config.n_embd//self.config.n_head)) for _ in range(self.config.num_hidden_layers)],
-                #values
-                [torch.zeros(
-                (input_ids.shape[0], input_ids.shape[1], self.config.n_head, self.config.n_embd//self.config.n_head)) for _ in range(self.config.num_hidden_layers)]
-            ] # batch_size x max_seq_len x num_heads x head_dim
 
-            cache_k, cache_v = past_key_values
-
-            print("Anisha: layer 1 cache_k's shape=past_key_values[0].shape = ", cache_k[0].shape)
-            print("Anisha: layer 1 cache_v's shape=past_key_values[1].shape = ", cache_v[0].shape)
             model_inputs = {"input_ids": input_ids.index_select(1, input_pos_tensor)}
             model_inputs.update(
             {
-                "past_key_values": past_key_values,#Anisha: TODO: need to create this earlier and pass
+                "past_key_values": past_key_values,#Anisha: created this earlier and passed
                 "use_cache": model_kwargs.get("use_cache"),
                 "position_ids": input_pos_tensor,
                 "attention_mask": model_kwargs["attention_mask"],
@@ -2278,7 +2281,8 @@ class GenerationMixin:
             )
 
           
-            print("Anisha: model_inputs=", model_inputs)
+            print("Anisha: model_inputs[\"input_ids\"]={}, model_inputs[\"attention_mask\"].shape={}.\
+            ".format(model_inputs["input_ids"], model_inputs["attention_mask"].shape) )
             
             decoding_start_time = time.time()
             # forward pass to get next token
@@ -2317,8 +2321,9 @@ class GenerationMixin:
 
             # argmax
             next_tokens = torch.argmax(next_tokens_scores, dim=-1)
-            print("Anisha: for cur_pos_tensor = {}, next_tokens.shape = {}, next_tokens = {} "\
-            .format(cur_pos_tensor, next_tokens.shape, next_tokens))
+            print(f"Anisha: Decoded in {time.time() - decoding_start_time:.2f} seconds")
+            print("Anisha: for cur_pos_tensor = {}, input_pos_tensor = {}, next_tokens.shape = {}, next_tokens = {} "\
+            .format(cur_pos_tensor, input_pos_tensor, next_tokens.shape, next_tokens))
 
             # finished sentences should have their next token be a padding token
             if eos_token_id is not None:
@@ -2347,7 +2352,6 @@ class GenerationMixin:
             input_pos_tensor = input_pos_tensor[-1:] + 1
             cur_pos_tensor += 1
             output_pos_tensor = cur_pos_tensor - 1
-            start_pos += 1
 
             # if eos_token was found in one sentence, set sentence to finished
             if eos_token_id_tensor is not None:
