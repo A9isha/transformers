@@ -346,7 +346,7 @@ class GPT2Attention(nn.Module):
             past_key.index_copy_(1, torch.squeeze(position_ids,-1), key.transpose(1,2))
             past_value.index_copy_(1, torch.squeeze(position_ids,-1), value.transpose(1,2))
             print("Anisha: newer past_key.index_select(1,torch.squeeze(position_ids,-1))=",past_key.index_select(1,torch.squeeze(position_ids,-1)))
-            print("Anisha: newer past_key.index_select(1,torch.squeeze(position_ids,-1))=",past_value.index_select(1,torch.squeeze(position_ids,-1)))
+            print("Anisha: newer past_value.index_select(1,torch.squeeze(position_ids,-1))=",past_value.index_select(1,torch.squeeze(position_ids,-1)))
             
 
             #Anisha: TODO: need to update key and value as the correct slice of past_key/past_value
@@ -820,8 +820,9 @@ class GPT2Model(GPT2PreTrainedModel):
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
         elif input_ids is not None:
-            input_shape = input_ids.size()
+            input_shape = input_ids.size() #Anisha: input_ids.shape=batch x 1
             input_ids = input_ids.view(-1, input_shape[-1])
+            print("Anisha: input_ids.shape={}".format(input_ids.shape))
             #Anisha: this needs to change because input_shape[-1] no longer gives the # of columns of input prompt
             #Anisha: but this is redundant for our case because the shape stays unchanged with these ops
             batch_size = input_ids.shape[0]
@@ -892,7 +893,7 @@ class GPT2Model(GPT2PreTrainedModel):
 
         if inputs_embeds is None:
             inputs_embeds = self.wte(input_ids)
-        position_embeds = self.wpe(position_ids)
+        position_embeds = self.wpe(position_ids).to(device)
         hidden_states = inputs_embeds + position_embeds #Anisha: batch x seqlen x model_dim
 
         if token_type_ids is not None:

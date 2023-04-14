@@ -2231,8 +2231,8 @@ class GenerationMixin:
         xm.mark_step() #Anisha:TODO: TypeError: mark_step() got an unexpected keyword argument 'wait'
         print(f"Input initialization in {time.time() - input_prepare_start_time:.2f} seconds")
 
-        print("Anisha: input_ids.shape={}, input_text_mask.shape={}, input_pos_tensor = {}, input_pos_tensor.shape= {}"\
-        .format(input_ids.shape,input_text_mask.shape,input_pos_tensor, input_pos_tensor.shape))
+        print("Anisha: input_ids.shape={}, input_text_mask.shape={}, input_pos_tensor = {}, input_pos_tensor.shape= {}, cur_pos_tensor={}, cur_pos_tensor.shape={}"\
+        .format(input_ids.shape,input_text_mask.shape,input_pos_tensor, input_pos_tensor.shape, cur_pos_tensor, cur_pos_tensor.shape))
 
         print("Anisha: self.config = {}".format(self.config))
 
@@ -2253,6 +2253,11 @@ class GenerationMixin:
         print("Anisha: layer 1 cache_k's shape=past_key_values[0].shape = ", cache_k[0].shape)
         print("Anisha: layer 1 cache_v's shape=past_key_values[1].shape = ", cache_v[0].shape)
         
+        #Anisha: TODO: create position_ids of shape batch x seqlength x embedding (same as input_ids)
+        position_ids = input_text_mask.long().cumsum(-1) - 1
+        position_ids.masked_fill_(input_text_mask == 0, 1)
+        # position_ids = position_ids[:, -1].unsqueeze(-1) #Anisha: TODO "since past_key_values" but we shouldn't take only the last value
+
         while True:
             #Anisha: TODO add break condition of start_pos==total_length-1
             
@@ -2269,12 +2274,12 @@ class GenerationMixin:
             # prepare model inputs
             # model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
-            model_inputs = {"input_ids": input_ids.index_select(1, input_pos_tensor)}
+            model_inputs = {"input_ids": input_ids.index_select(1, input_pos_tensor)} 
             model_inputs.update(
             {
                 "past_key_values": past_key_values,#Anisha: created this earlier and passed
                 "use_cache": model_kwargs.get("use_cache"),
-                "position_ids": input_pos_tensor,
+                "position_ids": position_ids,
                 "attention_mask": model_kwargs["attention_mask"],
                 "token_type_ids": model_kwargs.get("token_type_ids", None),
             }
