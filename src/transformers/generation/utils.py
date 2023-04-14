@@ -2226,7 +2226,7 @@ class GenerationMixin:
         input_pos_tensor = torch.arange(0, start_pos).to(input_ids.device)
         output_pos_tensor = cur_pos_tensor - 1
         #llama tokens=input_ids here
-        input_tokens = input_ids.index_select(1, input_pos_tensor)
+        # input_tokens = input_ids.index_select(1, input_pos_tensor)
         # xm.mark_step(wait=True)
         xm.mark_step() #Anisha:TODO: TypeError: mark_step() got an unexpected keyword argument 'wait'
         print(f"Input initialization in {time.time() - input_prepare_start_time:.2f} seconds")
@@ -2279,9 +2279,10 @@ class GenerationMixin:
             {
                 "past_key_values": past_key_values,#Anisha: created this earlier and passed
                 "use_cache": model_kwargs.get("use_cache"),
-                "position_ids": position_ids,
+                "position_ids": position_ids.index_select(1, input_pos_tensor+1),
                 "attention_mask": model_kwargs["attention_mask"],
                 "token_type_ids": model_kwargs.get("token_type_ids", None),
+                # "cur_pos_tensor": cur_pos_tensor,
             }
             )
 

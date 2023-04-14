@@ -166,6 +166,9 @@ class GPT2Attention(nn.Module):
 
         self.pruned_heads = set()
 
+        #Anisha: TODO: initialize cache_k and cache_v here
+
+
     def prune_heads(self, heads):
         print("Anisha: pruning heads")
         if len(heads) == 0:
@@ -894,6 +897,7 @@ class GPT2Model(GPT2PreTrainedModel):
         if inputs_embeds is None:
             inputs_embeds = self.wte(input_ids)
         position_embeds = self.wpe(position_ids).to(device)
+        print("Anisha: inputs_embeds.shape()={}, position_embeds.shape={}".format(inputs_embeds.shape, position_embeds.shape))
         hidden_states = inputs_embeds + position_embeds #Anisha: batch x seqlen x model_dim
 
         if token_type_ids is not None:
