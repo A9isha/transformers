@@ -2279,7 +2279,7 @@ class GenerationMixin:
             {
                 "past_key_values": past_key_values,#Anisha: created this earlier and passed
                 "use_cache": model_kwargs.get("use_cache"),
-                "position_ids": position_ids.index_select(1, input_pos_tensor+1),
+                "position_ids": input_pos_tensor,
                 "attention_mask": model_kwargs["attention_mask"],
                 "token_type_ids": model_kwargs.get("token_type_ids", None),
                 # "cur_pos_tensor": cur_pos_tensor,
@@ -2358,6 +2358,7 @@ class GenerationMixin:
             input_pos_tensor = input_pos_tensor[-1:] + 1
             cur_pos_tensor += 1
             output_pos_tensor = cur_pos_tensor - 1
+            start_pos += 1
 
             # if eos_token was found in one sentence, set sentence to finished
             if eos_token_id_tensor is not None:
@@ -2377,6 +2378,7 @@ class GenerationMixin:
                     break
                 else:
                     this_peer_finished = True
+            xm.mark_step()
 
         if return_dict_in_generate:
             if self.config.is_encoder_decoder:
