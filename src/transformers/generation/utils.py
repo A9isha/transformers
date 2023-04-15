@@ -730,8 +730,8 @@ class GenerationMixin:
         if "token_type_ids" in model_kwargs:
             token_type_ids = model_kwargs["token_type_ids"]
             model_kwargs["token_type_ids"] = torch.cat([token_type_ids, token_type_ids[:, -1].unsqueeze(-1)], dim=-1)
-        else:
-            print("Anisha: No token_type_ids")
+        # else:
+            # print("Anisha: No token_type_ids")
 
 
         if not is_encoder_decoder:
@@ -1420,7 +1420,7 @@ class GenerationMixin:
                     " greedy search."
                 )
 
-            print("Anisha: entering greedy_search")
+            # print("Anisha: entering greedy_search")
 
             # 11. run greedy search ATODO: this is the point of entry for gpt2 autoregressive decoding
             return self.greedy_search(
@@ -2207,7 +2207,7 @@ class GenerationMixin:
         min_prompt_size = min([len(t) for t in input_ids_unpadded])
         max_prompt_size = max([len(t) for t in input_ids_unpadded])
         total_len = min(self.config.max_position_embeddings, stopping_criteria[0].max_length)
-        print("Anisha self.config.max_position_embeddings={}, self.generation_config.max_length={} max_prompt_size = {}, stopping_criteria[0].max_length={}, total_len = {}".format(self.config.max_position_embeddings,self.generation_config.max_new_tokens,max_prompt_size,stopping_criteria[0].max_length,total_len))
+        # print("Anisha self.config.max_position_embeddings={}, self.generation_config.max_length={} max_prompt_size = {}, stopping_criteria[0].max_length={}, total_len = {}".format(self.config.max_position_embeddings,self.generation_config.max_new_tokens,max_prompt_size,stopping_criteria[0].max_length,total_len))
 
 
         # tokens = torch.full((bsz, total_len), self.tokenizer.pad_id).cuda().long()  # TODO: this line puts input to cuda device
@@ -2231,10 +2231,10 @@ class GenerationMixin:
         xm.mark_step() #Anisha:TODO: TypeError: mark_step() got an unexpected keyword argument 'wait'
         print(f"Input initialization in {time.time() - input_prepare_start_time:.2f} seconds")
 
-        print("Anisha: input_ids.shape={}, input_text_mask.shape={}, input_pos_tensor = {}, input_pos_tensor.shape= {}, cur_pos_tensor={}, cur_pos_tensor.shape={}"\
-        .format(input_ids.shape,input_text_mask.shape,input_pos_tensor, input_pos_tensor.shape, cur_pos_tensor, cur_pos_tensor.shape))
+        # print("Anisha: input_ids.shape={}, input_text_mask.shape={}, input_pos_tensor = {}, input_pos_tensor.shape= {}, cur_pos_tensor={}, cur_pos_tensor.shape={}"\
+        # .format(input_ids.shape,input_text_mask.shape,input_pos_tensor, input_pos_tensor.shape, cur_pos_tensor, cur_pos_tensor.shape))
 
-        print("Anisha: self.config = {}".format(self.config))
+        # print("Anisha: self.config = {}".format(self.config))
 
         this_peer_finished = False  # used by synced_gpus only
 
@@ -2250,8 +2250,8 @@ class GenerationMixin:
 
         cache_k, cache_v = past_key_values
 
-        print("Anisha: layer 1 cache_k's shape=past_key_values[0].shape = ", cache_k[0].shape)
-        print("Anisha: layer 1 cache_v's shape=past_key_values[1].shape = ", cache_v[0].shape)
+        # print("Anisha: layer 1 cache_k's shape=past_key_values[0].shape = ", cache_k[0].shape)
+        # print("Anisha: layer 1 cache_v's shape=past_key_values[1].shape = ", cache_v[0].shape)
         
         #Anisha: TODO: create position_ids of shape batch x seqlength x embedding (same as input_ids)
         position_ids = input_text_mask.long().cumsum(-1) - 1
@@ -2287,8 +2287,8 @@ class GenerationMixin:
             )
 
           
-            print("Anisha: model_inputs[\"input_ids\"]={}, model_inputs[\"attention_mask\"].shape={}.\
-            ".format(model_inputs["input_ids"], model_inputs["attention_mask"].shape) )
+            # print("Anisha: model_inputs[\"input_ids\"]={}, model_inputs[\"attention_mask\"].shape={}.\
+            # ".format(model_inputs["input_ids"], model_inputs["attention_mask"].shape) )
             
             decoding_start_time = time.time()
             # forward pass to get next token
@@ -2328,8 +2328,8 @@ class GenerationMixin:
             # argmax
             next_tokens = torch.argmax(next_tokens_scores, dim=-1)
             print(f"Anisha: Decoded in {time.time() - decoding_start_time:.2f} seconds")
-            print("Anisha: for cur_pos_tensor = {}, input_pos_tensor = {}, next_tokens.shape = {}, next_tokens = {} "\
-            .format(cur_pos_tensor, input_pos_tensor, next_tokens.shape, next_tokens))
+            # print("Anisha: for cur_pos_tensor = {}, input_pos_tensor = {}, next_tokens.shape = {}, next_tokens = {} "\
+            # .format(cur_pos_tensor, input_pos_tensor, next_tokens.shape, next_tokens))
 
             # finished sentences should have their next token be a padding token
             if eos_token_id is not None:
@@ -2371,9 +2371,9 @@ class GenerationMixin:
             #Anisha: TODO unfinished_sequences
             #Anisha:generate total_len-start_pos # of tokens
             if unfinished_sequences.max() == 0 or start_pos==total_len:
-                print("Anisha: ending because unfinished_sequences.max() == 0 = {}, start_pos={}, start_pos==total_len= {}".\
-                format(unfinished_sequences.max() == 0, start_pos, start_pos==total_len)
-                )
+                # print("Anisha: ending because unfinished_sequences.max() == 0 = {}, start_pos={}, start_pos==total_len= {}".\
+                # format(unfinished_sequences.max() == 0, start_pos, start_pos==total_len)
+                # )
                 if not synced_gpus:
                     break
                 else:

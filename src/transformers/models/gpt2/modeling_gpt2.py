@@ -170,7 +170,7 @@ class GPT2Attention(nn.Module):
 
 
     def prune_heads(self, heads):
-        print("Anisha: pruning heads")
+        # print("Anisha: pruning heads")
         if len(heads) == 0:
             return
         heads, index = find_pruneable_heads_and_indices(heads, self.num_heads, self.head_dim, self.pruned_heads)
@@ -326,13 +326,13 @@ class GPT2Attention(nn.Module):
 
 
         if layer_past is not None:
-            print("Anisha: layer_past is not None, len(layer_past)=", len(layer_past))
+            # print("Anisha: layer_past is not None, len(layer_past)=", len(layer_past))
             past_key, past_value = layer_past #Anisha: TODO: self.cache_k = self.cache_k.to(xq); self.cache_v = self.cache_v.to(xq)
             past_key = past_key.to(key)
             past_value = past_key.to(value)
 
-            print("Anisha: position_ids={}, position_ids.shape={}, past_key.shape={}, \
-            original key.shape={}".format(position_ids,position_ids.shape, past_key.shape, key.shape))
+            # print("Anisha: position_ids={}, position_ids.shape={}, past_key.shape={}, \
+            # original key.shape={}".format(position_ids,position_ids.shape, past_key.shape, key.shape))
 
             # batch_size, seqlen, _, _ = past_key.shape
             # key = torch.cat((past_key, key), dim=-2)#Anisha: change this, insert into past instead of 
@@ -344,19 +344,19 @@ class GPT2Attention(nn.Module):
             # key = past_key[:batch_size, : self.start_pos + seq_len]
             # value = self.cache_v[:bsz, : self.start_pos + seq_len]
 
-            print("Anisha: older past_key.index_select(1,torch.squeeze(position_ids,-1))=",past_key.index_select(1,torch.squeeze(position_ids,-1)))
-            print("Anisha: older past_key.index_select(1,torch.squeeze(position_ids,-1))=",past_value.index_select(1,torch.squeeze(position_ids,-1)))
+            # print("Anisha: older past_key.index_select(1,torch.squeeze(position_ids,-1))=",past_key.index_select(1,torch.squeeze(position_ids,-1)))
+            # print("Anisha: older past_key.index_select(1,torch.squeeze(position_ids,-1))=",past_value.index_select(1,torch.squeeze(position_ids,-1)))
             past_key.index_copy_(1, torch.squeeze(position_ids,-1), key.transpose(1,2))
             past_value.index_copy_(1, torch.squeeze(position_ids,-1), value.transpose(1,2))
-            print("Anisha: newer past_key.index_select(1,torch.squeeze(position_ids,-1))=",past_key.index_select(1,torch.squeeze(position_ids,-1)))
-            print("Anisha: newer past_value.index_select(1,torch.squeeze(position_ids,-1))=",past_value.index_select(1,torch.squeeze(position_ids,-1)))
+            # print("Anisha: newer past_key.index_select(1,torch.squeeze(position_ids,-1))=",past_key.index_select(1,torch.squeeze(position_ids,-1)))
+            # print("Anisha: newer past_value.index_select(1,torch.squeeze(position_ids,-1))=",past_value.index_select(1,torch.squeeze(position_ids,-1)))
             
 
             #Anisha: TODO: need to update key and value as the correct slice of past_key/past_value
             key = past_key[:,:]
-            print("Anisha: key.shape after key = past_key[:,:] is ", key.shape)
+            # print("Anisha: key.shape after key = past_key[:,:] is ", key.shape)
             key = key.transpose(1,2)
-            print("Anisha: key.shape after key = key.transpose(1,2) is ", key.shape)
+            # print("Anisha: key.shape after key = key.transpose(1,2) is ", key.shape)
             value = past_value[:,:]
             value = value.transpose(1,2)
             
@@ -812,7 +812,7 @@ class GPT2Model(GPT2PreTrainedModel):
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple, BaseModelOutputWithPastAndCrossAttentions]:
 
-        print("Anisha: inside forward of class GPT2Model(GPT2PreTrainedModel) in modeling_gpt2:")
+        # print("Anisha: inside forward of class GPT2Model(GPT2PreTrainedModel) in modeling_gpt2:")
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -825,7 +825,7 @@ class GPT2Model(GPT2PreTrainedModel):
         elif input_ids is not None:
             input_shape = input_ids.size() #Anisha: input_ids.shape=batch x 1
             input_ids = input_ids.view(-1, input_shape[-1])
-            print("Anisha: input_ids.shape={}".format(input_ids.shape))
+            # print("Anisha: input_ids.shape={}".format(input_ids.shape))
             #Anisha: this needs to change because input_shape[-1] no longer gives the # of columns of input prompt
             #Anisha: but this is redundant for our case because the shape stays unchanged with these ops
             batch_size = input_ids.shape[0]
@@ -897,7 +897,7 @@ class GPT2Model(GPT2PreTrainedModel):
         if inputs_embeds is None:
             inputs_embeds = self.wte(input_ids)
         position_embeds = self.wpe(position_ids).to(device)
-        print("Anisha: inputs_embeds.shape()={}, position_embeds.shape={}".format(inputs_embeds.shape, position_embeds.shape))
+        # print("Anisha: inputs_embeds.shape()={}, position_embeds.shape={}".format(inputs_embeds.shape, position_embeds.shape))
         hidden_states = inputs_embeds + position_embeds #Anisha: batch x seqlen x model_dim
 
         if token_type_ids is not None:
@@ -923,7 +923,7 @@ class GPT2Model(GPT2PreTrainedModel):
         for i, block in enumerate(self.h): #Anisha: i is the layer index
             # Model parallel
             layer_past = [past_key_values[0][i],past_key_values[1][i]]
-            print("Anisha: inside forward of GPT2's Model parallel")
+            # print("Anisha: inside forward of GPT2's Model parallel")
             if self.model_parallel:
                 torch.cuda.set_device(hidden_states.device)
                 # Ensure layer_past is on same device as hidden_states (might not be correct)
@@ -1069,11 +1069,11 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
         self.lm_head = new_embeddings
 
     def prepare_inputs_for_generation(self, input_ids, past_key_values=None, inputs_embeds=None, **kwargs):
-        print("Anisha: inside prepare_inputs_for_generation \n Anisha kwarg=", kwargs)
+        # print("Anisha: inside prepare_inputs_for_generation \n Anisha kwarg=", kwargs)
         token_type_ids = kwargs.get("token_type_ids", None)
         # only last token for inputs_ids if past is defined in kwargs
         if past_key_values:
-            print("Anisha: recompilation happening for token_type_ids?")
+            # print("Anisha: recompilation happening for token_type_ids?")
             # input_ids = input_ids[:, -1].unsqueeze(-1) # Anisha: transformers by default only keep the last column of input_ids from 2nd iteration onwards
             ##but for ARD we are not modifying input_ids?
             if token_type_ids is not None:
@@ -1084,14 +1084,14 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
         input_pos_tensor = kwargs.get("input_pos_tensor", None)
         cur_pos_tensor = kwargs.get("cur_pos_tensor", None)
 
-        print("Anisha: attention_mask = ", attention_mask)
-        print("Anisha: position_ids = ", position_ids)
-        if not past_key_values:
-            print("Anisha: past_key_values = None ", past_key_values)
-        else:                  
-            print("Anisha: past_key_values.shape() = ", len(past_key_values))
-        print("Anisha: token_type_ids = ", token_type_ids)
-        print("Anisha: use_cache = ", kwargs.get("use_cache"))
+        # print("Anisha: attention_mask = ", attention_mask)
+        # print("Anisha: position_ids = ", position_ids)
+        # if not past_key_values:
+            # print("Anisha: past_key_values = None ", past_key_values)
+        # if past_key_values:
+            # print("Anisha: past_key_values.shape() = ", len(past_key_values))
+        # print("Anisha: token_type_ids = ", token_type_ids)
+        # print("Anisha: use_cache = ", kwargs.get("use_cache"))
 
 
         # if attention_mask is not None and position_ids is None:
@@ -1196,7 +1196,7 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
             output = (lm_logits,) + transformer_outputs[1:]
             return ((loss,) + output) if loss is not None else output
 
-        print("Anisha: outputting CausalLMOutputWithCrossAttentions")
+        # print("Anisha: outputting CausalLMOutputWithCrossAttentions")
 
         return CausalLMOutputWithCrossAttentions(
             loss=loss,
