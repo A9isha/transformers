@@ -2217,10 +2217,6 @@ class GenerationMixin:
         # device = xm.xla_device()
         input_ids = input_ids.to(input_ids_unpadded.device)
         input_text_mask = input_ids != pad_token_id
-        #Anisha: recompute the attention_mask by _prepare_attention_mask_for_generation()
-        model_kwargs["attention_mask"] = self._prepare_attention_mask_for_generation(
-                input_ids, pad_token_id, eos_token_id
-            )
         start_pos = 1
         # self.start_pos = start_pos
         #Anisha: store the cur_pos which is the index where the next token will be inserted
@@ -2239,6 +2235,8 @@ class GenerationMixin:
         # mask_generation += 1
         # mask_generation = torch.zeros(input_ids.shape[:2], device=input_ids.device)
         # mask_generation = input_ids.new_ones((input_ids.shape[0], 1))
+                #Anisha: recompute the attention_mask by _prepare_attention_mask_for_generation()
+        model_kwargs["attention_mask"] = mask_generation
         print("Anisha: model_kwargs=", model_kwargs)
         xm.mark_step() #Anisha:TODO: TypeError: mark_step() got an unexpected keyword argument 'wait'
         print(f"Input initialization in {time.time() - input_prepare_start_time:.2f} seconds")
@@ -2287,7 +2285,8 @@ class GenerationMixin:
             # model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
             model_inputs = {"input_ids": input_ids.index_select(1, input_pos_tensor)} 
-            mask_generation.index_copy_(1, input_pos_tensor, mask_generation.new_ones((mask_generation.shape[0], 1)))
+            new_mask = mask_generation.new_ones((mask_generation.shape[0], 1)).masked_fill(model_inputs['input_ids']==pad_token_id,0)
+            mask_generation.index_copy_(1, input_pos_tensor, new_mask)
             model_inputs.update(
             {
                 "past_key_values": past_key_values,#Anisha: created this earlier and passed
@@ -2302,7 +2301,13 @@ class GenerationMixin:
           
             # print("Anisha: model_inputs[\"input_ids\"]={}, model_inputs[\"attention_mask\"].shape={}.\
             # ".format(model_inputs["input_ids"], model_inputs["attention_mask"].shape) )
-            
+            logger.warning(f"Anisha: model_inputs['input_ids'] = {model_inputs['input_ids']},\
+                           model_inputs['position_ids'] = {model_inputs['position_ids']}, \
+                           model_inputs['attention_mask'] = {model_inputs['attention_mask']}")
+            if model_inputs['past_key_values']:
+                logger.warning(f"model_inputs['past_key_values'][0]={model_inputs['past_key_values'][0]}")
+            else:
+                logger.warning("model_inputs['past_key_values']=None")
             decoding_start_time = time.time()
             # forward pass to get next token
             outputs = self(
@@ -2311,7 +2316,7 @@ class GenerationMixin:
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
             )
-
+            logger.warning(f"Anisha: outputs = {outputs}")
             if synced_gpus and this_peer_finished:
                 continue  # don't waste resources running the code we don't need
 
