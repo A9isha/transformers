@@ -325,6 +325,8 @@ class GPT2Attention(nn.Module):
         key = self._split_heads(key, self.num_heads, self.head_dim) #batch x num_heads x seqlen x head_dim
         value = self._split_heads(value, self.num_heads, self.head_dim) #batch x num_heads x seqlen x head_dim
 
+        print(f"Anisha: outside layer_past: query.shape = {query.shape}, key={key.shape}")
+
 
         if layer_past is not None:
             # print("Anisha: layer_past is not None, len(layer_past)=", len(layer_past))
@@ -332,8 +334,8 @@ class GPT2Attention(nn.Module):
             past_key = past_key.to(key)
             past_value = past_key.to(value)
 
-            # print("Anisha: position_ids={}, position_ids.shape={}, past_key.shape={}, \
-            # original key.shape={}".format(position_ids,position_ids.shape, past_key.shape, key.shape))
+            print("Anisha: position_ids={}, position_ids.shape={}, past_key.shape={}, \
+            original key.shape={}".format(position_ids,position_ids.shape, past_key.shape, key.shape))
 
             # batch_size, seqlen, _, _ = past_key.shape
             # key = torch.cat((past_key, key), dim=-2)#Anisha: change this, insert into past instead of 
@@ -347,8 +349,8 @@ class GPT2Attention(nn.Module):
 
             # print("Anisha: older past_key.index_select(1,torch.squeeze(position_ids,-1))=",past_key.index_select(1,torch.squeeze(position_ids,-1)))
             # print("Anisha: older past_key.index_select(1,torch.squeeze(position_ids,-1))=",past_value.index_select(1,torch.squeeze(position_ids,-1)))
-            past_key.index_copy_(1, torch.squeeze(position_ids,-1), key.transpose(1,2))
-            past_value.index_copy_(1, torch.squeeze(position_ids,-1), value.transpose(1,2))
+            past_key.index_copy_(2, torch.squeeze(position_ids,-1), key)
+            past_value.index_copy_(2, torch.squeeze(position_ids,-1), value)
             # print("Anisha: newer past_key.index_select(1,torch.squeeze(position_ids,-1))=",past_key.index_select(1,torch.squeeze(position_ids,-1)))
             # print("Anisha: newer past_value.index_select(1,torch.squeeze(position_ids,-1))=",past_value.index_select(1,torch.squeeze(position_ids,-1)))
             
@@ -356,10 +358,10 @@ class GPT2Attention(nn.Module):
             #Anisha: TODO: need to update key and value as the correct slice of past_key/past_value
             key = past_key[:,:]
             # print("Anisha: key.shape after key = past_key[:,:] is ", key.shape)
-            key = key.transpose(1,2)
+            # key = key.transpose(1,2)
             # print("Anisha: key.shape after key = key.transpose(1,2) is ", key.shape)
             value = past_value[:,:]
-            value = value.transpose(1,2)
+            # value = value.transpose(1,2)
             
         #Anisha: TODO: do we need to return present anymore?
         if use_cache is True:
@@ -924,7 +926,7 @@ class GPT2Model(GPT2PreTrainedModel):
         # for i, (block, layer_past) in enumerate(zip(self.h, past_key_values)):
         for i, block in enumerate(self.h): #Anisha: i is the layer index
             # Model parallel
-            layer_past = [past_key_values[0][i],past_key_values[1][i]]
+            layer_past = [past_key_values[i][0],past_key_values[i][1]]
             # print("Anisha: inside forward of GPT2's Model parallel")
             if self.model_parallel:
                 torch.cuda.set_device(hidden_states.device)

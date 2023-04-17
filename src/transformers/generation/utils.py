@@ -2254,20 +2254,20 @@ class GenerationMixin:
         past_key_values = [
             #keys
             [torch.zeros(
-            (input_ids.shape[0], input_ids.shape[1], self.config.n_head, self.config.n_embd//self.config.n_head)) for _ in range(self.config.num_hidden_layers)],
+            (input_ids.shape[0], self.config.n_head, input_ids.shape[1], self.config.n_embd//self.config.n_head)),
             #values
-            [torch.zeros(
-            (input_ids.shape[0], input_ids.shape[1], self.config.n_head, self.config.n_embd//self.config.n_head)) for _ in range(self.config.num_hidden_layers)]
-        ] # batch_size x max_seq_len x num_heads x head_dim
+            torch.zeros(
+            (input_ids.shape[0], self.config.n_head, input_ids.shape[1], self.config.n_embd//self.config.n_head))] for _ in range(self.config.num_hidden_layers)
+        ] # batch_size x num_heads x max_seq_len x head_dim
 
-        cache_k, cache_v = past_key_values
+        # cache_k, cache_v = past_key_values
 
         # print("Anisha: layer 1 cache_k's shape=past_key_values[0].shape = ", cache_k[0].shape)
         # print("Anisha: layer 1 cache_v's shape=past_key_values[1].shape = ", cache_v[0].shape)
         
         #Anisha: TODO: create position_ids of shape batch x seqlength x embedding (same as input_ids)
-        position_ids = input_text_mask.long().cumsum(-1) - 1
-        position_ids.masked_fill_(input_text_mask == 0, 1)
+        # position_ids = input_text_mask.long().cumsum(-1) - 1
+        # position_ids.masked_fill_(input_text_mask == 0, 1)
         # position_ids = position_ids[:, -1].unsqueeze(-1) #Anisha: TODO "since past_key_values" but we shouldn't take only the last value
 
         while True:
