@@ -2232,12 +2232,14 @@ class GenerationMixin:
         # input_tokens = input_ids.index_select(1, input_pos_tensor)
         # xm.mark_step(wait=True)
         
-        mask_generation = torch.full(input_ids.shape[:2], float("-inf"), device=input_ids.device,).to(torch.float)
+        # mask_generation = torch.full(input_ids.shape[:2], float("-inf"), device=input_ids.device,).to(torch.float)
+        mask_generation = torch.full(input_ids.shape[:2], float(0), device=input_ids.device,).to(torch.float)
         # mask_generation = torch.full(input_ids.shape[:2], -1 , device=input_ids.device,).to(torch.float)
         # mask_generation  = torch.triu(mask_generation, diagonal=1)
         # mask_generation += 1
         # mask_generation = torch.zeros(input_ids.shape[:2], device=input_ids.device)
         # mask_generation = input_ids.new_ones((input_ids.shape[0], 1))
+        print("Anisha: model_kwargs=", model_kwargs)
         xm.mark_step() #Anisha:TODO: TypeError: mark_step() got an unexpected keyword argument 'wait'
         print(f"Input initialization in {time.time() - input_prepare_start_time:.2f} seconds")
 
@@ -2361,9 +2363,11 @@ class GenerationMixin:
             # input_ids = torch.cat([input_ids, next_tokens[:, None]], dim=-1) 
             input_ids.index_copy_(1, cur_pos_tensor, next_tokens) #Anisha: using index_copy to update
             
+            #update model kwargs for generation
             # model_kwargs = self._update_model_kwargs_for_generation(
             #     outputs, model_kwargs, is_encoder_decoder=self.config.is_encoder_decoder
             # )
+            past_key_values = outputs.past_key_values #Anisha: mask is updated in model_inputs directly
 
             #Anisha: update the indices
             input_pos_tensor = input_pos_tensor[-1:] + 1
