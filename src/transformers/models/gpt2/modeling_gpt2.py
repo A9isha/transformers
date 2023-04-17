@@ -186,6 +186,7 @@ class GPT2Attention(nn.Module):
         self.pruned_heads = self.pruned_heads.union(heads)
 
     def _attn(self, query, key, value, attention_mask=None, head_mask=None):
+        print("Anisha: query.shape = {}, key.shape = {}".format(query.shape, key.shape))
         attn_weights = torch.matmul(query, key.transpose(-1, -2))
 
         if self.scale_attn_weights:
@@ -368,6 +369,7 @@ class GPT2Attention(nn.Module):
 
         
         if self.reorder_and_upcast_attn:
+            print("Anisha: Anisha inside reorder_and_upcast_attn")
             attn_output, attn_weights = self._upcast_and_reordered_attn(query, key, value, attention_mask, head_mask)
         else:
             attn_output, attn_weights = self._attn(query, key, value, attention_mask, head_mask)
