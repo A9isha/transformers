@@ -2209,7 +2209,8 @@ class GenerationMixin:
         total_len = min(self.config.max_position_embeddings, stopping_criteria[0].max_length)
         # print("Anisha self.config.max_position_embeddings={}, self.generation_config.max_length={} max_prompt_size = {}, stopping_criteria[0].max_length={}, total_len = {}".format(self.config.max_position_embeddings,self.generation_config.max_new_tokens,max_prompt_size,stopping_criteria[0].max_length,total_len))
 
-
+        len_input_ids_unpadded = input_ids_unpadded.shape[1]
+        print(f"Anisha: len_input_ids_unpadded = {len_input_ids_unpadded}")
         # tokens = torch.full((bsz, total_len), self.tokenizer.pad_id).cuda().long()  # TODO: this line puts input to cuda device
         input_ids = torch.full((input_ids_unpadded.shape[0], total_len), pad_token_id).long()
         for k, t in enumerate(input_ids_unpadded):
@@ -2217,6 +2218,7 @@ class GenerationMixin:
         # device = xm.xla_device()
         input_ids = input_ids.to(input_ids_unpadded.device)
         input_text_mask = input_ids != pad_token_id
+        print(f"Anisha: input_text_mask = {input_text_mask} ")
         start_pos = 1
         # self.start_pos = start_pos
         #Anisha: store the cur_pos which is the index where the next token will be inserted
@@ -2361,6 +2363,7 @@ class GenerationMixin:
             # print("Anisha: for cur_pos_tensor = {}, input_pos_tensor = {}, next_tokens.shape = {}, next_tokens = {} "\
             # .format(cur_pos_tensor, input_pos_tensor, next_tokens.shape, next_tokens))
 
+            print(f"Anisha: unfinished_sequences = {unfinished_sequences}, generated_next_tokens = {next_tokens}")
             # finished sentences should have their next token be a padding token
             if eos_token_id is not None:
                 if pad_token_id is None:
@@ -2368,12 +2371,13 @@ class GenerationMixin:
                 next_tokens = next_tokens * unfinished_sequences + pad_token_id * (1 - unfinished_sequences)
 
             next_tokens = next_tokens.reshape(-1)
-            # only replace token if prompt has already been generated
+            # only replace token if prompt has already been generated and not part of original left padding
             input_text_mask_tmp = input_text_mask.index_select(1, cur_pos_tensor).squeeze(dim=1)
             tokens_tmp = input_ids.index_select(1, cur_pos_tensor).squeeze(dim=1)
             next_tokens = torch.where(
-                input_text_mask_tmp, tokens_tmp, next_tokens
-            )
+                cur_pos_tensor<len_input_ids_unpadded, tokens_tmp, next_tokens
+            )            
+
             # tokens[:, cur_pos] = next_token
             next_tokens = next_tokens.unsqueeze(1)
             # update generated ids, model inputs, and length for next step
@@ -2394,7 +2398,7 @@ class GenerationMixin:
             position_ids += 1
 
             # if eos_token was found in one sentence, set sentence to finished
-            if eos_token_id_tensor is not None:
+            if cur_pos_tensor>len_input_ids_unpadded and eos_token_id_tensor is not None:
                 unfinished_sequences = unfinished_sequences.mul(
                     next_tokens.tile(eos_token_id_tensor.shape[0], 1).ne(eos_token_id_tensor.unsqueeze(1)).prod(dim=0)
                 )
