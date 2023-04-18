@@ -2244,7 +2244,7 @@ class GenerationMixin:
         # print(f"Anisha: position_ids after subtraction = {position_ids}, pad_token_id = {pad_token_id}")
         position_ids = position_ids.to(input_ids.device)
         all_zero_position_id = torch.zeros(input_ids.shape[0],1).long().to(input_ids.device)
-        print("Anisha: model_kwargs=", model_kwargs)
+        # print("Anisha: model_kwargs=", model_kwargs)
         xm.mark_step() #Anisha:TODO: TypeError: mark_step() got an unexpected keyword argument 'wait'
         print(f"Input initialization in {time.time() - input_prepare_start_time:.2f} seconds")
 
@@ -2308,18 +2308,18 @@ class GenerationMixin:
             }
             )
 
-            logger.warning(f"Anisha: position_ids = {position_ids}, new_position_ids ={new_position_ids}, new_mask = {new_mask} ")
+            # logger.warning(f"Anisha: position_ids = {position_ids}, new_position_ids ={new_position_ids}, new_mask = {new_mask} ")
 
           
-            # print("Anisha: model_inputs[\"input_ids\"]={}, model_inputs[\"attention_mask\"].shape={}.\
-            # ".format(model_inputs["input_ids"], model_inputs["attention_mask"].shape) )
+            print("Anisha: model_inputs[\"input_ids\"]={}, model_inputs[\"attention_mask\"].shape={}.\
+            ".format(model_inputs["input_ids"], model_inputs["attention_mask"].shape) )
             logger.warning(f"Anisha: model_inputs['input_ids'] = {model_inputs['input_ids']},\
                            model_inputs['position_ids'] = {model_inputs['position_ids']}, \
                            model_inputs['attention_mask'] = {model_inputs['attention_mask']}")
             if model_inputs['past_key_values']:
-                logger.warning(f"model_inputs['past_key_values'][0]={model_inputs['past_key_values'][0]}")
+                logger.warning(f"Anisha: model_inputs['past_key_values'][0]={model_inputs['past_key_values'][0]}")
             else:
-                logger.warning("model_inputs['past_key_values']=None")
+                logger.warning("Anisha: model_inputs['past_key_values']=None")
             decoding_start_time = time.time()
             # forward pass to get next token
             outputs = self(

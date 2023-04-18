@@ -186,7 +186,7 @@ class GPT2Attention(nn.Module):
         self.pruned_heads = self.pruned_heads.union(heads)
 
     def _attn(self, query, key, value, attention_mask=None, head_mask=None):
-        print("Anisha: query.shape = {}, key.shape = {}".format(query.shape, key.shape))
+        # print("Anisha: query.shape = {}, key.shape = {}".format(query.shape, key.shape))
         attn_weights = torch.matmul(query, key.transpose(-1, -2))
 
         if self.scale_attn_weights:
@@ -326,18 +326,18 @@ class GPT2Attention(nn.Module):
         key = self._split_heads(key, self.num_heads, self.head_dim) #batch x num_heads x seqlen x head_dim
         value = self._split_heads(value, self.num_heads, self.head_dim) #batch x num_heads x seqlen x head_dim
 
-        print(f"Anisha: outside layer_past: query.shape = {query.shape}, key={key.shape}")
+        # print(f"Anisha: outside layer_past: query.shape = {query.shape}, key={key.shape}")
 
 
         if layer_past is not None:
             # print("Anisha: layer_past is not None, len(layer_past)=", len(layer_past))
             past_key, past_value = layer_past #Anisha: TODO: self.cache_k = self.cache_k.to(xq); self.cache_v = self.cache_v.to(xq)
             past_key = past_key.to(key)
-            past_value = past_key.to(value)
+            past_value = past_value.to(value)
 
-            print("Anisha: input_pos_tensor={}, input_pos_tensor.shape={},position_ids={}, position_ids.shape={}, past_key.shape={}, \
-            original key.shape={}"\
-                  .format(input_pos_tensor, input_pos_tensor.shape, position_ids,position_ids.shape, past_key.shape, key.shape))
+            # print("Anisha: input_pos_tensor={}, input_pos_tensor.shape={},position_ids={}, position_ids.shape={}, past_key.shape={}, \
+            # original key.shape={}"\
+                #   .format(input_pos_tensor, input_pos_tensor.shape, position_ids,position_ids.shape, past_key.shape, key.shape))
 
             # batch_size, seqlen, _, _ = past_key.shape
             # key = torch.cat((past_key, key), dim=-2)#Anisha: change this, insert into past instead of 
@@ -373,7 +373,7 @@ class GPT2Attention(nn.Module):
 
         
         if self.reorder_and_upcast_attn:
-            print("Anisha: Anisha inside reorder_and_upcast_attn")
+            # print("Anisha: Anisha inside reorder_and_upcast_attn")
             attn_output, attn_weights = self._upcast_and_reordered_attn(query, key, value, attention_mask, head_mask)
         else:
             attn_output, attn_weights = self._attn(query, key, value, attention_mask, head_mask)
@@ -437,6 +437,12 @@ class GPT2Block(nn.Module):
     ) -> Union[Tuple[torch.Tensor], Optional[Tuple[torch.Tensor, Tuple[torch.FloatTensor, ...]]]]:
         residual = hidden_states
         hidden_states = self.ln_1(hidden_states)
+        logger.warning(f"Anisha: before calling attn hidden_states = {hidden_states},\
+        layer_past={layer_past},\
+        attention_mask={attention_mask},\
+        head_mask={head_mask},\
+        use_cache={use_cache},\
+        output_attentions={output_attentions}")
         attn_outputs = self.attn(
             hidden_states,
             layer_past=layer_past,
@@ -829,7 +835,7 @@ class GPT2Model(GPT2PreTrainedModel):
         use_cache = use_cache if use_cache is not None else self.config.use_cache
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        print(f"Anisha: inside GPT2Model(GPT2PreTrainedModel) input_pos_tensor = {input_pos_tensor} ")
+        # print(f"Anisha: inside GPT2Model(GPT2PreTrainedModel) input_pos_tensor = {input_pos_tensor} ")
 
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
@@ -907,9 +913,12 @@ class GPT2Model(GPT2PreTrainedModel):
 
         if inputs_embeds is None:
             inputs_embeds = self.wte(input_ids)
+        
+        logger.warning(f"Anisha: inputs_embeds = {inputs_embeds}")
         position_embeds = self.wpe(position_ids).to(device)
         # print("Anisha: inputs_embeds.shape()={}, position_embeds.shape={}".format(inputs_embeds.shape, position_embeds.shape))
         hidden_states = inputs_embeds + position_embeds #Anisha: batch x seqlen x model_dim
+        logger.warning(f"Anisha: hidden_states = {hidden_states}")
 
         if token_type_ids is not None:
             token_type_embeds = self.wte(token_type_ids)

@@ -32,8 +32,8 @@ tokenizer = AutoTokenizer.from_pretrained("gpt2")
 
 tokenizer.pad_token = tokenizer.eos_token
 tokenizer.padding_side = "left"
-inputs = tokenizer(["Sky is the limit","Anisha learning"],return_tensors='pt', padding="longest")
-print(inputs)
+inputs = tokenizer(["Sky","Earth"],return_tensors='pt', padding="longest")
+print(f"inputs = {inputs}" )
 inputs = inputs.to(device)
 
 outputs=model.generate(**inputs, max_new_tokens=80, do_sample=False)
