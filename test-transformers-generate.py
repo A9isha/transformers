@@ -32,7 +32,7 @@ tokenizer = AutoTokenizer.from_pretrained("gpt2")
 
 tokenizer.pad_token = tokenizer.eos_token
 tokenizer.padding_side = "left"
-inputs = tokenizer(["Sky is the limit","Earth","United States"],return_tensors='pt', padding="longest")
+inputs = tokenizer(["Sky is the limit","Earth","United States","The Moon can","I really wish there was"],return_tensors='pt', padding="longest")
 print(f"inputs = {inputs}" )
 inputs = inputs.to(device)
 

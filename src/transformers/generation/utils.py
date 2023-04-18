@@ -2210,7 +2210,7 @@ class GenerationMixin:
         # print("Anisha self.config.max_position_embeddings={}, self.generation_config.max_length={} max_prompt_size = {}, stopping_criteria[0].max_length={}, total_len = {}".format(self.config.max_position_embeddings,self.generation_config.max_new_tokens,max_prompt_size,stopping_criteria[0].max_length,total_len))
 
         len_input_ids_unpadded = input_ids_unpadded.shape[1]
-        print(f"Anisha: len_input_ids_unpadded = {len_input_ids_unpadded}")
+        # print(f"Anisha: len_input_ids_unpadded = {len_input_ids_unpadded}")
         # tokens = torch.full((bsz, total_len), self.tokenizer.pad_id).cuda().long()  # TODO: this line puts input to cuda device
         input_ids = torch.full((input_ids_unpadded.shape[0], total_len), pad_token_id).long()
         for k, t in enumerate(input_ids_unpadded):
@@ -2218,7 +2218,7 @@ class GenerationMixin:
         # device = xm.xla_device()
         input_ids = input_ids.to(input_ids_unpadded.device)
         input_text_mask = input_ids != pad_token_id
-        print(f"Anisha: input_text_mask = {input_text_mask} ")
+        # print(f"Anisha: input_text_mask = {input_text_mask} ")
         start_pos = 1
         # self.start_pos = start_pos
         #Anisha: store the cur_pos which is the index where the next token will be inserted
@@ -2363,7 +2363,7 @@ class GenerationMixin:
             # print("Anisha: for cur_pos_tensor = {}, input_pos_tensor = {}, next_tokens.shape = {}, next_tokens = {} "\
             # .format(cur_pos_tensor, input_pos_tensor, next_tokens.shape, next_tokens))
 
-            print(f"Anisha: unfinished_sequences = {unfinished_sequences}, generated_next_tokens = {next_tokens}")
+            # print(f"Anisha: unfinished_sequences = {unfinished_sequences}, generated_next_tokens = {next_tokens}")
             # finished sentences should have their next token be a padding token
             if eos_token_id is not None:
                 if pad_token_id is None:
