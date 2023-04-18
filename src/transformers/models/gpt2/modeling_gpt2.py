@@ -437,12 +437,12 @@ class GPT2Block(nn.Module):
     ) -> Union[Tuple[torch.Tensor], Optional[Tuple[torch.Tensor, Tuple[torch.FloatTensor, ...]]]]:
         residual = hidden_states
         hidden_states = self.ln_1(hidden_states)
-        logger.warning(f"Anisha: before calling attn hidden_states = {hidden_states},\
-        layer_past={layer_past},\
-        attention_mask={attention_mask},\
-        head_mask={head_mask},\
-        use_cache={use_cache},\
-        output_attentions={output_attentions}")
+        # logger.warning(f"Anisha: before calling attn hidden_states = {hidden_states},\
+        # layer_past={layer_past},\
+        # attention_mask={attention_mask},\
+        # head_mask={head_mask},\
+        # use_cache={use_cache},\
+        # output_attentions={output_attentions}")
         attn_outputs = self.attn(
             hidden_states,
             layer_past=layer_past,
@@ -914,11 +914,11 @@ class GPT2Model(GPT2PreTrainedModel):
         if inputs_embeds is None:
             inputs_embeds = self.wte(input_ids)
         
-        logger.warning(f"Anisha: inputs_embeds = {inputs_embeds}")
+        # logger.warning(f"Anisha: inputs_embeds = {inputs_embeds}")
         position_embeds = self.wpe(position_ids).to(device)
         # print("Anisha: inputs_embeds.shape()={}, position_embeds.shape={}".format(inputs_embeds.shape, position_embeds.shape))
         hidden_states = inputs_embeds + position_embeds #Anisha: batch x seqlen x model_dim
-        logger.warning(f"Anisha: hidden_states = {hidden_states}")
+        # logger.warning(f"Anisha: hidden_states = {hidden_states}")
 
         if token_type_ids is not None:
             token_type_embeds = self.wte(token_type_ids)

@@ -2204,8 +2204,8 @@ class GenerationMixin:
 
         input_prepare_start_time = time.time()
         #Anisha: pad input_ids to fully padded tensors
-        min_prompt_size = min([len(t) for t in input_ids_unpadded])
-        max_prompt_size = max([len(t) for t in input_ids_unpadded])
+        # min_prompt_size = min([len(t) for t in input_ids_unpadded]) #Anisha: it is left padded, so min_prompt_size=max_prompt_size
+        # max_prompt_size = max([len(t) for t in input_ids_unpadded])
         total_len = min(self.config.max_position_embeddings, stopping_criteria[0].max_length)
         # print("Anisha self.config.max_position_embeddings={}, self.generation_config.max_length={} max_prompt_size = {}, stopping_criteria[0].max_length={}, total_len = {}".format(self.config.max_position_embeddings,self.generation_config.max_new_tokens,max_prompt_size,stopping_criteria[0].max_length,total_len))
 
@@ -2311,15 +2311,15 @@ class GenerationMixin:
             # logger.warning(f"Anisha: position_ids = {position_ids}, new_position_ids ={new_position_ids}, new_mask = {new_mask} ")
 
           
-            print("Anisha: model_inputs[\"input_ids\"]={}, model_inputs[\"attention_mask\"].shape={}.\
-            ".format(model_inputs["input_ids"], model_inputs["attention_mask"].shape) )
-            logger.warning(f"Anisha: model_inputs['input_ids'] = {model_inputs['input_ids']},\
-                           model_inputs['position_ids'] = {model_inputs['position_ids']}, \
-                           model_inputs['attention_mask'] = {model_inputs['attention_mask']}")
-            if model_inputs['past_key_values']:
-                logger.warning(f"Anisha: model_inputs['past_key_values'][0]={model_inputs['past_key_values'][0]}")
-            else:
-                logger.warning("Anisha: model_inputs['past_key_values']=None")
+            # print("Anisha: model_inputs[\"input_ids\"]={}, model_inputs[\"attention_mask\"].shape={}.\
+            # ".format(model_inputs["input_ids"], model_inputs["attention_mask"].shape) )
+            # logger.warning(f"Anisha: model_inputs['input_ids'] = {model_inputs['input_ids']},\
+            #                model_inputs['position_ids'] = {model_inputs['position_ids']}, \
+            #                model_inputs['attention_mask'] = {model_inputs['attention_mask']}")
+            # if model_inputs['past_key_values']:
+            #     logger.warning(f"Anisha: model_inputs['past_key_values'][0]={model_inputs['past_key_values'][0]}")
+            # else:
+            #     logger.warning("Anisha: model_inputs['past_key_values']=None")
             decoding_start_time = time.time()
             # forward pass to get next token
             outputs = self(
@@ -2328,7 +2328,7 @@ class GenerationMixin:
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
             )
-            logger.warning(f"Anisha: outputs = {outputs}")
+            # logger.warning(f"Anisha: outputs = {outputs}")
             if synced_gpus and this_peer_finished:
                 continue  # don't waste resources running the code we don't need
 
