@@ -2398,7 +2398,7 @@ class GenerationMixin:
             position_ids += 1
 
             # if eos_token was found in one sentence, set sentence to finished
-            if cur_pos_tensor>len_input_ids_unpadded and eos_token_id_tensor is not None:
+            if start_pos>len_input_ids_unpadded and eos_token_id_tensor is not None:
                 unfinished_sequences = unfinished_sequences.mul(
                     next_tokens.tile(eos_token_id_tensor.shape[0], 1).ne(eos_token_id_tensor.unsqueeze(1)).prod(dim=0)
                 )
@@ -2406,8 +2406,10 @@ class GenerationMixin:
             # stop when each sentence is finished, or if we exceed the maximum length
             # if unfinished_sequences.max() == 0 or stopping_criteria(input_ids, scores):
             #Anisha: TODO unfinished_sequences
-            #Anisha:generate total_len-start_pos # of tokens
-            if unfinished_sequences.max() == 0 or start_pos==total_len:
+            #Anisha:generate total_len-start_pos # of tokens, even if it is unfinished, we still keep on generating, because
+            #unfinished_sequences is a lazy tensor and using it in a condition statement forces it to evaluate
+            # if unfinished_sequences.max() == 0 or start_pos==total_len:
+            if start_pos==total_len:
                 # print("Anisha: ending because unfinished_sequences.max() == 0 = {}, start_pos={}, start_pos==total_len= {}".\
                 # format(unfinished_sequences.max() == 0, start_pos, start_pos==total_len)
                 # )
