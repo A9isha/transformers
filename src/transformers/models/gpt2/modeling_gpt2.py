@@ -305,6 +305,7 @@ class GPT2Attention(nn.Module):
         use_cache: Optional[bool] = False,
         output_attentions: Optional[bool] = False,
         position_ids:Optional[torch.Tensor] = None,
+        input_pos_tensor:Optional[torch.Tensor] = None,
     ) -> Tuple[Union[torch.Tensor, Tuple[torch.Tensor]], ...]:
         if encoder_hidden_states is not None:
             if not hasattr(self, "q_attn"):
@@ -334,8 +335,9 @@ class GPT2Attention(nn.Module):
             past_key = past_key.to(key)
             past_value = past_key.to(value)
 
-            print("Anisha: position_ids={}, position_ids.shape={}, past_key.shape={}, \
-            original key.shape={}".format(position_ids,position_ids.shape, past_key.shape, key.shape))
+            print("Anisha: input_pos_tensor={}, input_pos_tensor.shape={},position_ids={}, position_ids.shape={}, past_key.shape={}, \
+            original key.shape={}"\
+                  .format(input_pos_tensor, input_pos_tensor.shape, position_ids,position_ids.shape, past_key.shape, key.shape))
 
             # batch_size, seqlen, _, _ = past_key.shape
             # key = torch.cat((past_key, key), dim=-2)#Anisha: change this, insert into past instead of 
@@ -347,12 +349,12 @@ class GPT2Attention(nn.Module):
             # key = past_key[:batch_size, : self.start_pos + seq_len]
             # value = self.cache_v[:bsz, : self.start_pos + seq_len]
 
-            # print("Anisha: older past_key.index_select(1,torch.squeeze(position_ids,-1))=",past_key.index_select(1,torch.squeeze(position_ids,-1)))
-            # print("Anisha: older past_key.index_select(1,torch.squeeze(position_ids,-1))=",past_value.index_select(1,torch.squeeze(position_ids,-1)))
-            past_key.index_copy_(2, torch.squeeze(position_ids,-1), key)
-            past_value.index_copy_(2, torch.squeeze(position_ids,-1), value)
-            # print("Anisha: newer past_key.index_select(1,torch.squeeze(position_ids,-1))=",past_key.index_select(1,torch.squeeze(position_ids,-1)))
-            # print("Anisha: newer past_value.index_select(1,torch.squeeze(position_ids,-1))=",past_value.index_select(1,torch.squeeze(position_ids,-1)))
+            # print("Anisha: older past_key.index_select(1,torch.squeeze(input_pos_tensor,-1))=",past_key.index_select(1,torch.squeeze(input_pos_tensor,-1)))
+            # print("Anisha: older past_key.index_select(1,torch.squeeze(input_pos_tensor,-1))=",past_value.index_select(1,torch.squeeze(input_pos_tensor,-1)))
+            past_key.index_copy_(2, torch.squeeze(input_pos_tensor,-1), key)
+            past_value.index_copy_(2, torch.squeeze(input_pos_tensor,-1), value)
+            # print("Anisha: newer past_key.index_select(1,torch.squeeze(input_pos_tensor,-1))=",past_key.index_select(1,torch.squeeze(input_pos_tensor,-1)))
+            # print("Anisha: newer past_value.index_select(1,torch.squeeze(input_pos_tensor,-1))=",past_value.index_select(1,torch.squeeze(input_pos_tensor,-1)))
             
 
             #Anisha: TODO: need to update key and value as the correct slice of past_key/past_value
@@ -431,6 +433,7 @@ class GPT2Block(nn.Module):
         use_cache: Optional[bool] = False,
         output_attentions: Optional[bool] = False,
         position_ids:Optional[torch.Tensor] = None,
+        input_pos_tensor:Optional[torch.Tensor] = None,
     ) -> Union[Tuple[torch.Tensor], Optional[Tuple[torch.Tensor, Tuple[torch.FloatTensor, ...]]]]:
         residual = hidden_states
         hidden_states = self.ln_1(hidden_states)
@@ -442,6 +445,7 @@ class GPT2Block(nn.Module):
             use_cache=use_cache,
             output_attentions=output_attentions,
             position_ids=position_ids,
+            input_pos_tensor=input_pos_tensor,
         )
         attn_output = attn_outputs[0]  # output_attn: a, present, (attentions)
         outputs = attn_outputs[1:]
@@ -811,6 +815,7 @@ class GPT2Model(GPT2PreTrainedModel):
         encoder_hidden_states: Optional[torch.Tensor] = None,
         encoder_attention_mask: Optional[torch.FloatTensor] = None,
         use_cache: Optional[bool] = None,
+        input_pos_tensor: Optional[torch.Tensor] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
@@ -823,6 +828,8 @@ class GPT2Model(GPT2PreTrainedModel):
         )
         use_cache = use_cache if use_cache is not None else self.config.use_cache
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        print(f"Anisha: inside GPT2Model(GPT2PreTrainedModel) input_pos_tensor = {input_pos_tensor} ")
 
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
@@ -973,6 +980,7 @@ class GPT2Model(GPT2PreTrainedModel):
                     use_cache=use_cache,
                     output_attentions=output_attentions,
                     position_ids=position_ids,
+                    input_pos_tensor=input_pos_tensor,
                 )
 
             hidden_states = outputs[0]
@@ -1151,6 +1159,7 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
         encoder_attention_mask: Optional[torch.FloatTensor] = None,
         labels: Optional[torch.LongTensor] = None,
         use_cache: Optional[bool] = None,
+        input_pos_tensor:Optional[torch.Tensor] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
@@ -1174,6 +1183,7 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
             encoder_hidden_states=encoder_hidden_states,
             encoder_attention_mask=encoder_attention_mask,
             use_cache=use_cache,
+            input_pos_tensor=input_pos_tensor,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,

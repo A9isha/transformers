@@ -2222,7 +2222,7 @@ class GenerationMixin:
         #Anisha: store the cur_pos which is the index where the next token will be inserted
         cur_pos_tensor = torch.tensor(start_pos).to(input_ids.device)
         model_kwargs["cur_pos_tensor"] = cur_pos_tensor
-        input_pos_tensor = torch.arange(0, start_pos).to(input_ids.device)
+        input_pos_tensor = torch.arange(0, start_pos).to(input_ids.device)        
         output_pos_tensor = cur_pos_tensor - 1
         #llama tokens=input_ids here
         # input_tokens = input_ids.index_select(1, input_pos_tensor)
@@ -2237,6 +2237,13 @@ class GenerationMixin:
         # mask_generation = input_ids.new_ones((input_ids.shape[0], 1))
                 #Anisha: recompute the attention_mask by _prepare_attention_mask_for_generation()
         model_kwargs["attention_mask"] = mask_generation
+        #create position_ids
+        position_ids = torch.zeros(input_ids.shape[0],1).long()
+        # print(f"Anisha: input_ids_unpadded = {input_ids_unpadded}, input_ids_unpadded==pad_token_id = {input_ids_unpadded==pad_token_id}")
+        position_ids -= torch.count_nonzero(input_ids_unpadded==pad_token_id, dim=1).unsqueeze(-1)
+        # print(f"Anisha: position_ids after subtraction = {position_ids}, pad_token_id = {pad_token_id}")
+        position_ids = position_ids.to(input_ids.device)
+        all_zero_position_id = torch.zeros(input_ids.shape[0],1).long().to(input_ids.device)
         print("Anisha: model_kwargs=", model_kwargs)
         xm.mark_step() #Anisha:TODO: TypeError: mark_step() got an unexpected keyword argument 'wait'
         print(f"Input initialization in {time.time() - input_prepare_start_time:.2f} seconds")
@@ -2285,18 +2292,23 @@ class GenerationMixin:
             # model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
             model_inputs = {"input_ids": input_ids.index_select(1, input_pos_tensor)} 
+            model_inputs["input_pos_tensor"] = input_pos_tensor
             new_mask = mask_generation.new_ones((mask_generation.shape[0], 1)).masked_fill(model_inputs['input_ids']==pad_token_id,0)
             mask_generation.index_copy_(1, input_pos_tensor, new_mask)
+            new_position_ids = torch.maximum(position_ids,all_zero_position_id).to(input_ids.device)
+            new_position_ids.masked_fill_(new_mask == 0, 1)
             model_inputs.update(
             {
                 "past_key_values": past_key_values,#Anisha: created this earlier and passed
                 "use_cache": model_kwargs.get("use_cache"),
-                "position_ids": input_pos_tensor,
+                "position_ids": new_position_ids,
                 "attention_mask": mask_generation,#mask_generation.index_select(1, input_pos_tensor), #Anisha: pass precreated atttention_mask
                 "token_type_ids": model_kwargs.get("token_type_ids", None),
                 # "cur_pos_tensor": cur_pos_tensor,
             }
             )
+
+            logger.warning(f"Anisha: position_ids = {position_ids}, new_position_ids ={new_position_ids}, new_mask = {new_mask} ")
 
           
             # print("Anisha: model_inputs[\"input_ids\"]={}, model_inputs[\"attention_mask\"].shape={}.\
@@ -2379,6 +2391,7 @@ class GenerationMixin:
             cur_pos_tensor += 1
             output_pos_tensor = cur_pos_tensor - 1
             start_pos += 1
+            position_ids += 1
 
             # if eos_token was found in one sentence, set sentence to finished
             if eos_token_id_tensor is not None:
