@@ -15,7 +15,7 @@
 """ PyTorch GPT-J model."""
 
 import warnings
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Union, List
 
 import torch
 import torch.fx
@@ -192,24 +192,25 @@ class GPTJAttention(nn.Module):
 
     def forward(
         self,
-        hidden_states: torch.FloatTensor,
-        layer_past: Optional[Tuple[torch.Tensor]] = None,
+        hidden_states: Optional[Tuple[torch.FloatTensor]], #batch x seqlen x model_dim
+        layer_past: Optional[List[torch.Tensor]] = None, #Anisha: made this into Optional[List[torch.Tensor]] from Optional[Tuple[torch.Tensor]]
         attention_mask: Optional[torch.FloatTensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         head_mask: Optional[torch.FloatTensor] = None,
         use_cache: Optional[bool] = False,
         output_attentions: Optional[bool] = False,
+        input_pos_tensor:Optional[torch.Tensor] = None,
     ) -> Union[
         Tuple[torch.Tensor, Tuple[torch.Tensor]],
         Optional[Tuple[torch.Tensor, Tuple[torch.Tensor], Tuple[torch.Tensor, ...]]],
     ]:
-        query = self.q_proj(hidden_states)
-        key = self.k_proj(hidden_states)
-        value = self.v_proj(hidden_states)
+        query = self.q_proj(hidden_states) #batch x seqlen x model_dim
+        key = self.k_proj(hidden_states) #batch x seqlen x model_dim
+        value = self.v_proj(hidden_states) #Anisha: TODO: ensure attention_mask is right size and value
 
-        query = self._split_heads(query, self.num_attention_heads, self.head_dim, True)
-        key = self._split_heads(key, self.num_attention_heads, self.head_dim, True)
-        value = self._split_heads(value, self.num_attention_heads, self.head_dim, False)
+        query = self._split_heads(query, self.num_attention_heads, self.head_dim, True) #batch x num_heads x seqlen x head_dim
+        key = self._split_heads(key, self.num_attention_heads, self.head_dim, True) #batch x num_heads x seqlen x head_dim
+        value = self._split_heads(value, self.num_attention_heads, self.head_dim, False) #batch x num_heads x seqlen x head_dim
 
         if is_torch_fx_proxy(position_ids):
             # The logic to conditionally copy to GPU could not be traced, so we do this
@@ -244,8 +245,17 @@ class GPTJAttention(nn.Module):
         if layer_past is not None:
             past_key = layer_past[0]
             past_value = layer_past[1]
-            key = torch.cat((past_key, key), dim=-2)
-            value = torch.cat((past_value, value), dim=-2)
+            #Anisha: send the past_key and past_value to the device
+            past_key = past_key.to(key)
+            past_value = past_value.to(value)
+
+            # key = torch.cat((past_key, key), dim=-2)
+            # value = torch.cat((past_value, value), dim=-2)
+            past_key.index_copy_(2, torch.squeeze(input_pos_tensor,-1), key)
+            past_value.index_copy_(2, torch.squeeze(input_pos_tensor,-1), value)
+
+            key = past_key[:,:]
+            value = past_value[:,:]
 
         if use_cache is True:
             present = (key, value)
@@ -302,6 +312,7 @@ class GPTJBlock(nn.Module):
         head_mask: Optional[torch.FloatTensor] = None,
         use_cache: Optional[bool] = False,
         output_attentions: Optional[bool] = False,
+        input_pos_tensor:Optional[torch.Tensor] = None,
     ) -> Union[Tuple[torch.Tensor], Optional[Tuple[torch.Tensor, Tuple[torch.FloatTensor, ...]]]]:
         residual = hidden_states
         hidden_states = self.ln_1(hidden_states)
@@ -313,6 +324,7 @@ class GPTJBlock(nn.Module):
             head_mask=head_mask,
             use_cache=use_cache,
             output_attentions=output_attentions,
+            input_pos_tensor=input_pos_tensor,
         )
         attn_output = attn_outputs[0]  # output_attn: a, present, (attentions)
         outputs = attn_outputs[1:]
@@ -561,6 +573,7 @@ class GPTJModel(GPTJPreTrainedModel):
         head_mask: Optional[torch.FloatTensor] = None,
         inputs_embeds: Optional[torch.FloatTensor] = None,
         use_cache: Optional[bool] = None,
+        input_pos_tensor: Optional[torch.Tensor] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
@@ -575,7 +588,7 @@ class GPTJModel(GPTJPreTrainedModel):
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
         elif input_ids is not None:
-            input_shape = input_ids.size()
+            input_shape = input_ids.size() #Anisha: input_ids.shape=batch x 1
             input_ids = input_ids.view(-1, input_shape[-1])
             batch_size = input_ids.shape[0]
         elif inputs_embeds is not None:
@@ -586,17 +599,18 @@ class GPTJModel(GPTJPreTrainedModel):
 
         device = input_ids.device if input_ids is not None else inputs_embeds.device
 
-        if token_type_ids is not None:
+        if token_type_ids is not None: #Anisha: token_type_ids is None for us
             token_type_ids = token_type_ids.view(-1, input_shape[-1])
 
         if position_ids is not None:
             position_ids = position_ids.view(-1, input_shape[-1]).long()
 
-        if past_key_values is None:
-            past_length = 0
-            past_key_values = tuple([None] * len(self.h))
-        else:
-            past_length = past_key_values[0][0].size(-2)
+        # if past_key_values is None:
+        #     past_length = 0
+        #     past_key_values = tuple([None] * len(self.h))
+        # else:
+        #     past_length = past_key_values[0][0].size(-2)
+        past_length = past_key_values[0][0].size(-2) #Anisha: past_length is not used by us
 
         if position_ids is None:
             position_ids = torch.arange(past_length, input_shape[-1] + past_length, dtype=torch.long, device=device)
@@ -657,7 +671,9 @@ class GPTJModel(GPTJPreTrainedModel):
                 torch.cuda.set_device(hidden_states.device)
                 # Ensure layer_past is on same device as hidden_states (might not be correct)
                 if layer_past is not None:
-                    layer_past = tuple(past_state.to(hidden_states.device) for past_state in layer_past)
+                    # layer_past = tuple(past_state.to(hidden_states.device) for past_state in layer_past)
+                    #Anisha: TODO: if decoding one token at a time then this list will have only past_state
+                    layer_past = [past_state.to(hidden_states.device) for past_state in layer_past] 
                 # Ensure that attention_mask is always on the same device as hidden_states
                 if attention_mask is not None:
                     attention_mask = attention_mask.to(hidden_states.device)
@@ -692,6 +708,7 @@ class GPTJModel(GPTJPreTrainedModel):
                     head_mask=head_mask[i],
                     use_cache=use_cache,
                     output_attentions=output_attentions,
+                    input_pos_tensor=input_pos_tensor,
                 )
 
             hidden_states = outputs[0]
@@ -837,6 +854,7 @@ class GPTJForCausalLM(GPTJPreTrainedModel):
         inputs_embeds: Optional[torch.FloatTensor] = None,
         labels: Optional[torch.LongTensor] = None,
         use_cache: Optional[bool] = None,
+        input_pos_tensor:Optional[torch.Tensor] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
@@ -858,6 +876,7 @@ class GPTJForCausalLM(GPTJPreTrainedModel):
             head_mask=head_mask,
             inputs_embeds=inputs_embeds,
             use_cache=use_cache,
+            input_pos_tensor=input_pos_tensor,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,

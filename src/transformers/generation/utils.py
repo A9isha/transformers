@@ -2278,8 +2278,8 @@ class GenerationMixin:
         # position_ids = position_ids[:, -1].unsqueeze(-1) #Anisha: TODO "since past_key_values" but we shouldn't take only the last value
 
         while True:
-            #Anisha: TODO add break condition of start_pos==total_length-1
-            
+            #Anisha: Done add break condition of start_pos==total_length-1
+            generation_of_one_token_time = time.time()
             if synced_gpus:
                 # Under synced_gpus the `forward` call must continue until all gpus complete their sequence.
                 # The following logic allows an early break if all peers finished generating their sequence
@@ -2418,6 +2418,7 @@ class GenerationMixin:
                 else:
                     this_peer_finished = True
             xm.mark_step()
+            print(f"Anisha: generated one token in {time.time() - generation_of_one_token_time:.2f} seconds")
 
         if return_dict_in_generate:
             if self.config.is_encoder_decoder:
