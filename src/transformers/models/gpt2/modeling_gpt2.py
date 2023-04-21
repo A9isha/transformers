@@ -351,8 +351,10 @@ class GPT2Attention(nn.Module):
 
             # print("Anisha: older past_key.index_select(1,torch.squeeze(input_pos_tensor,-1))=",past_key.index_select(1,torch.squeeze(input_pos_tensor,-1)))
             # print("Anisha: older past_key.index_select(1,torch.squeeze(input_pos_tensor,-1))=",past_value.index_select(1,torch.squeeze(input_pos_tensor,-1)))
+            # print(f"Anisha: past_key.shape={past_key.shape},input_pos_tensor.shape={input_pos_tensor.shape}, key.shape={key.shape}, value.shape={value.shape}")
             past_key.index_copy_(2, torch.squeeze(input_pos_tensor,-1), key)
             past_value.index_copy_(2, torch.squeeze(input_pos_tensor,-1), value)
+            # print("Anisha: copy done")
             # print("Anisha: newer past_key.index_select(1,torch.squeeze(input_pos_tensor,-1))=",past_key.index_select(1,torch.squeeze(input_pos_tensor,-1)))
             # print("Anisha: newer past_value.index_select(1,torch.squeeze(input_pos_tensor,-1))=",past_value.index_select(1,torch.squeeze(input_pos_tensor,-1)))
             
@@ -861,11 +863,26 @@ class GPT2Model(GPT2PreTrainedModel):
         if position_ids is not None:
             position_ids = position_ids.view(-1, input_shape[-1]) 
 
-        # if past_key_values is None: #Anisha: initially it is None for iteration 1
-        #     past_length = 0
-        # #     past_key_values = tuple([None] * len(self.h))
-        # else:
-        past_length = past_key_values[0][0].size(-2)
+        if past_key_values is None: #Anisha: originally initially it is None for iteration 1
+            # and in case of a simple forward pass
+            print("Anisha: past_key_values was None, so populating")
+            # past_key_values = [
+            # #keys
+            # [torch.zeros(
+            # (input_ids.shape[0], self.config.n_head, input_ids.shape[1], self.config.n_embd//self.config.n_head)),
+            # #values
+            # torch.zeros(
+            # (input_ids.shape[0], self.config.n_head, input_ids.shape[1], self.config.n_embd//self.config.n_head))] for _ in range(self.config.num_hidden_layers)
+            # ] # batch_size x num_heads x max_seq_len x head_dim
+            # input_pos_tensor = torch.arange(0, 1).to(input_ids.device)
+
+            position_ids = attention_mask.long().cumsum(-1) - 1
+            position_ids.masked_fill_(attention_mask == 0, 1)
+
+            past_length = 0
+            past_key_values = tuple([None] * len(self.h))
+        else:
+            past_length = past_key_values[0][0].size(-2)
         
         
 
@@ -942,7 +959,10 @@ class GPT2Model(GPT2PreTrainedModel):
         # for i, (block, layer_past) in enumerate(zip(self.h, past_key_values)):
         for i, block in enumerate(self.h): #Anisha: i is the layer index
             # Model parallel
-            layer_past = [past_key_values[i][0],past_key_values[i][1]]
+            if past_key_values[i] is not None:
+                layer_past = [past_key_values[i][0],past_key_values[i][1]]
+            else:
+                layer_past = None
             # print("Anisha: inside forward of GPT2's Model parallel")
             if self.model_parallel:
                 torch.cuda.set_device(hidden_states.device)

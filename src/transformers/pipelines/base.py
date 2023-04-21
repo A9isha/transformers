@@ -996,10 +996,15 @@ class Pipeline(_ScikitCompat):
         raise NotImplementedError("postprocess not implemented")
 
     def get_inference_context(self):
+        if version.parse(version.parse(torch.__version__).base_version) >= version.parse("1.9.0"):
+            print("Anisha: inside get_inference_context and torch.__version__ = ", torch.__version__)
         inference_context = (
-            torch.inference_mode
-            if version.parse(version.parse(torch.__version__).base_version) >= version.parse("1.9.0")
-            else torch.no_grad
+            # torch.inference_mode
+            # if version.parse(version.parse(torch.__version__).base_version) >= version.parse("1.9.0")
+            # else torch.no_grad
+            #Anisha: always use torch.no_grad
+            torch.no_grad
+
         )
         return inference_context
 

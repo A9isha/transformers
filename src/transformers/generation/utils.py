@@ -2248,7 +2248,7 @@ class GenerationMixin:
         all_zero_position_id = torch.zeros(input_ids.shape[0],1).long().to(input_ids.device)
         # print("Anisha: model_kwargs=", model_kwargs)
         xm.mark_step() #Anisha:TODO: TypeError: mark_step() got an unexpected keyword argument 'wait'
-        print(f"Input initialization in {time.time() - input_prepare_start_time:.2f} seconds")
+        logger.info(f"Input initialization in {time.time() - input_prepare_start_time:.2f} seconds")
 
         # print("Anisha: input_ids.shape={}, input_text_mask.shape={}, input_pos_tensor = {}, input_pos_tensor.shape= {}, cur_pos_tensor={}, cur_pos_tensor.shape={}"\
         # .format(input_ids.shape,input_text_mask.shape,input_pos_tensor, input_pos_tensor.shape, cur_pos_tensor, cur_pos_tensor.shape))

@@ -741,6 +741,7 @@ class DistilBertForSequenceClassification(DistilBertPreTrainedModel):
         output_type=SequenceClassifierOutput,
         config_class=_CONFIG_FOR_DOC,
     )
+
     def forward(
         self,
         input_ids: Optional[torch.Tensor] = None,
@@ -759,7 +760,6 @@ class DistilBertForSequenceClassification(DistilBertPreTrainedModel):
             `config.num_labels > 1` a classification loss is computed (Cross-Entropy).
         """
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-
         distilbert_output = self.distilbert(
             input_ids=input_ids,
             attention_mask=attention_mask,
